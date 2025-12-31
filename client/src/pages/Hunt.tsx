@@ -10,7 +10,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
 import { Slider } from "@/components/ui/slider";
-import { Search, Loader2, Target, TrendingUp, Users, User, DollarSign, ExternalLink, ChevronRight, Sparkles, Gauge, Mail, CheckCircle, AlertCircle, HelpCircle, Globe, FileText, Lock, Zap, Flame, Activity, Download, Filter, X, ArrowUpDown, SlidersHorizontal, Eye } from "lucide-react";
+import { Search, Loader2, Target, TrendingUp, Users, DollarSign, ExternalLink, ChevronRight, Sparkles, Gauge, Mail, CheckCircle, AlertCircle, HelpCircle, Globe, FileText, Lock, Zap, Flame, Activity, Download, Filter, X, ArrowUpDown, SlidersHorizontal, Eye } from "lucide-react";
 import ReactMarkdown from "react-markdown";
 import { motion, AnimatePresence } from "framer-motion";
 import { apiRequest } from "@/lib/queryClient";
@@ -314,27 +314,9 @@ export default function Hunt() {
     }
   };
   
-  // State for auto-load functionality
-  const [hasAutoLoaded, setHasAutoLoaded] = useState(false);
-  const [initialQuery, setInitialQuery] = useState<string | null>(null);
-  
-  // Check for query params (q for search query, verified for magic link redirect)
+  // Check for verified=true query param (redirected from magic link)
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
-    
-    // Check for search query from Feed page redirect
-    const searchQuery = params.get('q');
-    if (searchQuery) {
-      setQuery(searchQuery);
-      setInitialQuery(searchQuery);
-      // Clean URL but keep on hunt page
-      window.history.replaceState({}, '', '/hunt');
-    } else {
-      // No query param - set default for auto-load
-      setInitialQuery("productivity");
-    }
-    
-    // Check for verified=true (redirected from magic link)
     if (params.get('verified') === 'true') {
       analytics.sessionVerified();
       refetchSession();
@@ -595,15 +577,16 @@ export default function Hunt() {
     if (!query.trim()) return;
     
     analytics.searchInitiated(query, scanType);
+    
+    // No email gate for scanning - let users try the product first!
+    // Free users get starter-scan (cached demo results), premium get live scan
     analytics.scanStarted(query, scanType === 'all' ? 14 : 1);
     
-    // Authenticated users get live scans (pro features like contact info still gated)
-    // Only non-authenticated users get demo results
-    if (isAuthenticated) {
-      // Authenticated users get live API scan
+    if (isPro) {
+      // Premium users get live API scan
       scanMutation.mutate();
     } else {
-      // Non-authenticated users get starter scan (demo results, no API cost)
+      // Free users get starter scan (demo results, no API cost)
       starterScanMutation.mutate(query);
     }
     setSelectedAsset(null);
@@ -647,11 +630,12 @@ export default function Hunt() {
 
   const triggerScan = (searchQuery: string = "productivity") => {
     analytics.searchInitiated(searchQuery, scanType);
+    
+    // No email gate - let users try the product!
     setQuery(searchQuery);
     analytics.scanStarted(searchQuery, scanType === 'all' ? 14 : 1);
     
-    // Authenticated users get live scans, others get demo
-    if (isAuthenticated) {
+    if (isPro) {
       scanMutation.mutate();
     } else {
       starterScanMutation.mutate(searchQuery);
@@ -659,18 +643,6 @@ export default function Hunt() {
     setSelectedAsset(null);
     setAnalysis(null);
   };
-  
-  // AUTO-LOAD: Trigger initial scan when page loads (Alpha Feed experience)
-  useEffect(() => {
-    if (initialQuery && !hasAutoLoaded && !scanMutation.isPending && !starterScanMutation.isPending) {
-      setHasAutoLoaded(true);
-      // Slight delay to ensure UI is ready
-      const timer = setTimeout(() => {
-        triggerScan(initialQuery);
-      }, 300);
-      return () => clearTimeout(timer);
-    }
-  }, [initialQuery, hasAutoLoaded, scanMutation.isPending, starterScanMutation.isPending]);
   
   // Combined loading state for either scan type
   const isScanning = scanMutation.isPending || starterScanMutation.isPending;
@@ -764,35 +736,29 @@ export default function Hunt() {
   const totalMrr = assets.reduce((sum, a) => sum + a.mrr_potential, 0);
 
   return (
-    <div className="space-y-6">
+    <div className="max-w-7xl mx-auto space-y-6">
       
-      {/* ALPHA TERMINAL HEADER */}
-      <div className="relative pt-2 pb-4">
-        {/* Terminal header with live status */}
+      {/* COMPACT WORK-FOCUSED HEADER - Cockpit/Terminal style */}
+      <div className="relative pt-4 pb-4">
+        {/* Compact header with search as primary focus */}
         <div className="flex flex-col gap-4">
           
-          {/* Top bar: Terminal status */}
+          {/* Top bar: Status + Sign in */}
           <div className="flex items-center justify-between gap-4">
             <div className="flex items-center gap-3">
-              {/* Live terminal indicator */}
-              <div className="flex items-center gap-2 px-3 py-1.5 rounded-md glass-terminal">
+              {/* Live indicator */}
+              <div className="flex items-center gap-2 px-3 py-1.5 rounded-full glass border border-border/30">
                 <div className="relative">
-                  <div className="w-2 h-2 rounded-full bg-primary" />
-                  <div className="absolute inset-0 w-2 h-2 rounded-full bg-primary animate-ping opacity-60" />
+                  <div className="w-2 h-2 rounded-full bg-accent" />
+                  <div className="absolute inset-0 w-2 h-2 rounded-full bg-accent animate-ping opacity-60" />
                 </div>
-                <span className="text-xs font-mono text-muted-foreground">14 MKTS LIVE</span>
+                <span className="text-xs font-medium text-muted-foreground">14 Markets Live</span>
               </div>
               
               {isPro && (
-                <Badge variant="secondary" className="bg-primary/15 text-primary border-primary/25 rounded-md font-mono text-[10px]">
+                <Badge variant="secondary" className="bg-[hsl(var(--accent)/0.1)] text-[hsl(var(--accent))] border-[hsl(var(--accent)/0.2)] rounded-full">
                   <Zap className="w-3 h-3 mr-1" />
-                  PRO ACCESS
-                </Badge>
-              )}
-              {isAuthenticated && !isPro && (
-                <Badge variant="secondary" className="bg-white/5 text-muted-foreground border-white/10 rounded-md font-mono text-[10px]">
-                  <User className="w-3 h-3 mr-1" />
-                  AUTHENTICATED
+                  Pro
                 </Badge>
               )}
             </div>
@@ -800,127 +766,123 @@ export default function Hunt() {
             {!isPro && !isAuthenticated && (
               <button 
                 onClick={() => setShowProLoginPrompt(true)}
-                className="text-xs font-mono text-muted-foreground hover:text-primary transition-colors"
+                className="text-sm text-muted-foreground hover:text-[hsl(var(--accent))] transition-colors"
                 data-testid="button-pro-login"
               >
-                EXISTING ACCESS? SIGN IN
+                Already have access? Sign in
               </button>
-            )}
-            {isAuthenticated && !isPro && (
-              <Link 
-                href="/pricing"
-                className="text-xs font-mono text-primary hover:text-primary/80 transition-colors"
-                data-testid="button-upgrade-pro"
-              >
-                UPGRADE FOR CONTACT DATA
-              </Link>
             )}
           </div>
 
-          {/* Search Form - Terminal style */}
+          {/* Search Form - Compact, work-focused */}
           <form 
             onSubmit={handleSearch} 
             className="w-full"
-          >
-            <div className="p-3 glass-terminal rounded-lg">
-              <div className="flex flex-col md:flex-row gap-3">
-                <div className="relative flex-1">
-                  <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-                  <Input
-                    value={query}
-                    onChange={(e) => setQuery(e.target.value)}
-                    placeholder="Search niche (productivity, CRM, inventory...)"
-                    className="h-12 pl-11 font-mono text-sm rounded-md border-white/10 bg-white/5 focus-visible:ring-1 focus-visible:ring-primary/50 focus-visible:border-primary/50"
-                    data-testid="input-niche"
-                  />
-                </div>
-                <Select value={scanType} onValueChange={setScanType}>
-                  <SelectTrigger className="w-full md:w-[160px] h-12 rounded-md border-white/10 bg-white/5 font-mono text-sm" data-testid="select-marketplace">
-                    <Globe className="w-4 h-4 mr-2 text-muted-foreground" />
-                    <SelectValue placeholder="All Markets" />
-                  </SelectTrigger>
-                  <SelectContent className="z-[100] rounded-md glass-terminal font-mono text-sm">
-                    <SelectItem value="all">ALL (14)</SelectItem>
-                    <SelectItem value="chrome">Chrome</SelectItem>
-                    <SelectItem value="firefox">Firefox</SelectItem>
-                    <SelectItem value="shopify">Shopify</SelectItem>
-                    <SelectItem value="wordpress">WordPress</SelectItem>
-                    <SelectItem value="slack">Slack</SelectItem>
-                    <SelectItem value="zapier">Zapier</SelectItem>
-                    <SelectItem value="producthunt">Product Hunt</SelectItem>
-                    <SelectItem value="forsale">For Sale</SelectItem>
-                    <SelectItem value="ios">iOS</SelectItem>
-                    <SelectItem value="android">Android</SelectItem>
-                    <SelectItem value="microsoft">Microsoft</SelectItem>
-                    <SelectItem value="salesforce">Salesforce</SelectItem>
-                    <SelectItem value="atlassian">Atlassian</SelectItem>
-                    <SelectItem value="gumroad">Gumroad</SelectItem>
-                  </SelectContent>
-                </Select>
-                <Button 
-                  type="submit"
-                  disabled={isScanning || !query.trim()}
-                  size="lg"
-                  className="h-12 px-8 rounded-md bg-primary text-primary-foreground hover:bg-primary/90 font-mono text-sm uppercase tracking-wider"
-                  data-testid="button-hunt"
-                >
-                  {isScanning ? (
-                    <>
-                      <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                      SCANNING
-                    </>
-                  ) : (
-                    <>
-                      <Target className="w-4 h-4 mr-2" />
-                      SCAN
-                    </>
-                  )}
-                </Button>
+        >
+          <div className="p-3 glass-strong shadow-soft-xl rounded-2xl border border-border/30">
+            <div className="flex flex-col md:flex-row gap-3">
+              <div className="relative flex-1">
+                <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-muted-foreground" />
+                <Input
+                  value={query}
+                  onChange={(e) => setQuery(e.target.value)}
+                  placeholder="Search any niche (productivity, inventory, CRM...)"
+                  className="h-14 pl-12 text-base rounded-xl border border-border/50 bg-background/50 focus-visible:ring-2 focus-visible:ring-primary/50 focus-visible:border-primary"
+                  data-testid="input-niche"
+                />
               </div>
+              <Select value={scanType} onValueChange={setScanType}>
+                <SelectTrigger className="w-full md:w-[180px] h-14 rounded-xl border border-border/50 bg-background/50 text-base" data-testid="select-marketplace">
+                  <Globe className="w-4 h-4 mr-2 text-muted-foreground" />
+                  <SelectValue placeholder="All Markets" />
+                </SelectTrigger>
+                <SelectContent className="z-[100] rounded-xl">
+                  <SelectItem value="all">All Markets (14)</SelectItem>
+                  <SelectItem value="chrome">Chrome</SelectItem>
+                  <SelectItem value="firefox">Firefox</SelectItem>
+                  <SelectItem value="shopify">Shopify</SelectItem>
+                  <SelectItem value="wordpress">WordPress</SelectItem>
+                  <SelectItem value="slack">Slack</SelectItem>
+                  <SelectItem value="zapier">Zapier</SelectItem>
+                  <SelectItem value="producthunt">Product Hunt</SelectItem>
+                  <SelectItem value="forsale">For Sale</SelectItem>
+                  <SelectItem value="ios">iOS App Store</SelectItem>
+                  <SelectItem value="android">Google Play</SelectItem>
+                  <SelectItem value="microsoft">Microsoft/Edge</SelectItem>
+                  <SelectItem value="salesforce">Salesforce</SelectItem>
+                  <SelectItem value="atlassian">Atlassian</SelectItem>
+                  <SelectItem value="gumroad">Gumroad</SelectItem>
+                </SelectContent>
+              </Select>
+              <Button 
+                type="submit"
+                disabled={isScanning || !query.trim()}
+                size="lg"
+                className="h-14 px-10 rounded-xl bg-foreground text-background hover:bg-foreground/90 font-semibold shadow-soft-lg text-base transition-all duration-300"
+                data-testid="button-hunt"
+              >
+                {isScanning ? (
+                  <>
+                    <Loader2 className="w-5 h-5 mr-2 animate-spin" />
+                    Scanning...
+                  </>
+                ) : (
+                  <>
+                    <Search className="w-5 h-5 mr-2" />
+                    Start Scan
+                  </>
+                )}
+              </Button>
             </div>
-          </form>
+          </div>
+          
+          {/* Helper text below form */}
+          <p className="text-sm text-muted-foreground mt-4 text-center">
+            No credit card required. See results in 30 seconds.
+          </p>
+        </form>
         </div>
       </div>
 
-      {/* Stats Bar - Terminal glassmorphic panel */}
+      {/* Stats Bar - Premium glassmorphic panel matching Landing page */}
       {assets.length > 0 && (
         <motion.div 
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.4, ease: [0.22, 1, 0.36, 1] }}
-          className="glass-terminal rounded-lg"
+          transition={{ duration: 0.6, ease: [0.22, 1, 0.36, 1] }}
+          className="glass-card shadow-soft-lg rounded-2xl border border-border/30"
         >
-          <div className="grid grid-cols-1 sm:grid-cols-3 divide-y sm:divide-y-0 sm:divide-x divide-white/5">
-            <div className="p-4 text-center">
+          <div className="grid grid-cols-1 sm:grid-cols-3 divide-y sm:divide-y-0 sm:divide-x divide-border/30">
+            <div className="p-6 text-center">
               <div className="flex items-center justify-center gap-3">
-                <div className="w-10 h-10 rounded-md bg-primary/15 border border-primary/25 flex items-center justify-center">
-                  <Target className="w-5 h-5 text-primary" />
+                <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-primary/20 to-accent/20 flex items-center justify-center">
+                  <Target className="w-6 h-6 text-primary" />
                 </div>
                 <div className="text-left">
-                  <p className="text-2xl font-bold text-foreground font-mono" data-testid="text-assets-count">{assets.length}</p>
-                  <p className="text-[10px] text-muted-foreground uppercase tracking-wider">ASSETS</p>
+                  <p className="text-3xl font-bold text-foreground font-mono" data-testid="text-assets-count">{assets.length}</p>
+                  <p className="text-sm text-muted-foreground mt-0.5">Assets Found</p>
                 </div>
               </div>
             </div>
-            <div className="p-4 text-center">
+            <div className="p-6 text-center">
               <div className="flex items-center justify-center gap-3">
-                <div className="w-10 h-10 rounded-md bg-white/5 border border-white/10 flex items-center justify-center">
-                  <Users className="w-5 h-5 text-muted-foreground" />
+                <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-primary/20 to-accent/20 flex items-center justify-center">
+                  <Users className="w-6 h-6 text-primary" />
                 </div>
                 <div className="text-left">
-                  <p className="text-2xl font-bold text-foreground font-mono" data-testid="text-total-users">{totalUsers.toLocaleString()}</p>
-                  <p className="text-[10px] text-muted-foreground uppercase tracking-wider">USERS</p>
+                  <p className="text-3xl font-bold text-foreground font-mono" data-testid="text-total-users">{totalUsers.toLocaleString()}</p>
+                  <p className="text-sm text-muted-foreground mt-0.5">Total Users</p>
                 </div>
               </div>
             </div>
-            <div className="p-4 text-center">
+            <div className="p-6 text-center">
               <div className="flex items-center justify-center gap-3">
-                <div className="w-10 h-10 rounded-md bg-primary/15 border border-primary/25 flex items-center justify-center">
-                  <DollarSign className="w-5 h-5 text-primary" />
+                <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-accent/20 to-emerald-500/20 flex items-center justify-center">
+                  <DollarSign className="w-6 h-6 text-accent" />
                 </div>
                 <div className="text-left">
-                  <p className="text-2xl font-bold text-primary font-mono" data-testid="text-mrr-potential">${totalMrr.toLocaleString()}</p>
-                  <p className="text-[10px] text-muted-foreground uppercase tracking-wider">MRR EST.</p>
+                  <p className="text-3xl font-bold text-accent font-mono" data-testid="text-mrr-potential">${totalMrr.toLocaleString()}</p>
+                  <p className="text-sm text-muted-foreground mt-0.5">MRR Potential</p>
                 </div>
               </div>
             </div>
@@ -928,26 +890,26 @@ export default function Hunt() {
         </motion.div>
       )}
 
-      {/* Loading State - Terminal shimmer */}
+      {/* Loading State - Premium glassmorphic shimmer */}
       {isScanning && (
-        <div className="space-y-6">
+        <div className="space-y-8">
           {/* Scanning indicator */}
           <div className="text-center">
-            <div className="inline-flex items-center gap-3 px-4 py-3 glass-terminal rounded-lg">
-              <Loader2 className="w-4 h-4 animate-spin text-primary" />
-              <span className="text-xs font-mono text-foreground uppercase tracking-wider">SCANNING 14 MARKETPLACES</span>
+            <div className="inline-flex items-center gap-3 px-6 py-4 glass-strong shadow-soft-lg rounded-2xl border border-border/30">
+              <Loader2 className="w-5 h-5 animate-spin text-accent" />
+              <span className="text-sm text-foreground font-medium">Scanning 14 marketplaces...</span>
             </div>
           </div>
 
           {/* Stats skeleton */}
-          <div className="glass-terminal rounded-lg">
-            <div className="grid grid-cols-1 sm:grid-cols-3 divide-y sm:divide-y-0 sm:divide-x divide-white/5">
+          <div className="glass-card shadow-soft-lg rounded-2xl border border-border/30">
+            <div className="grid grid-cols-1 sm:grid-cols-3 divide-y sm:divide-y-0 sm:divide-x divide-border/30">
               {[...Array(3)].map((_, i) => (
-                <div key={i} className="p-4 flex items-center justify-center gap-3">
-                  <Skeleton className="w-10 h-10 rounded-md bg-white/5" />
+                <div key={i} className="p-6 flex items-center justify-center gap-3">
+                  <Skeleton className="w-12 h-12 rounded-2xl" />
                   <div className="space-y-2">
-                    <Skeleton className="h-6 w-20 rounded bg-white/5" />
-                    <Skeleton className="h-3 w-14 rounded bg-white/5" />
+                    <Skeleton className="h-8 w-24 rounded-lg" />
+                    <Skeleton className="h-3 w-16 rounded" />
                   </div>
                 </div>
               ))}
@@ -955,79 +917,80 @@ export default function Hunt() {
           </div>
 
           {/* Asset card skeletons */}
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
             {[...Array(6)].map((_, i) => (
-              <div key={i} className="p-4 glass-card rounded-lg animate-pulse">
-                <div className="flex items-start justify-between gap-2 mb-3">
-                  <Skeleton className="h-4 w-16 rounded bg-white/5" />
-                  <Skeleton className="h-5 w-20 rounded bg-white/5" />
+              <div key={i} className="p-6 glass-card shadow-soft-lg rounded-2xl border border-border/30 animate-pulse">
+                <div className="flex items-start justify-between gap-2 mb-4">
+                  <Skeleton className="h-5 w-20 rounded-full" />
+                  <Skeleton className="h-6 w-28 rounded-lg" />
                 </div>
-                <Skeleton className="h-5 w-3/4 mb-2 rounded bg-white/5" />
-                <Skeleton className="h-4 w-full mb-3 rounded bg-white/5" />
-                <div className="flex items-center gap-4 mb-3">
-                  <Skeleton className="h-4 w-20 rounded bg-white/5" />
-                  <Skeleton className="h-4 w-16 rounded bg-white/5" />
+                <Skeleton className="h-6 w-3/4 mb-2 rounded-lg" />
+                <Skeleton className="h-4 w-full mb-4 rounded" />
+                <div className="flex items-center gap-4 mb-4">
+                  <Skeleton className="h-4 w-24 rounded" />
+                  <Skeleton className="h-4 w-20 rounded" />
                 </div>
-                <Skeleton className="h-8 w-full rounded bg-white/5" />
+                <Skeleton className="h-10 w-full rounded-xl" />
               </div>
             ))}
           </div>
         </div>
       )}
 
-      {/* Error State - Terminal styling */}
+      {/* Error State - Premium styling matching Landing page */}
       {scanError && !isScanning && (
         <motion.div 
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
-          className="max-w-md mx-auto text-center space-y-4 py-8"
+          className="max-w-md mx-auto text-center space-y-6 py-12"
         >
-          <div className="w-12 h-12 mx-auto rounded-md bg-destructive/15 border border-destructive/25 flex items-center justify-center">
-            <AlertCircle className="w-6 h-6 text-destructive" />
+          <div className="w-16 h-16 mx-auto rounded-2xl bg-gradient-to-br from-red-500/20 to-orange-500/20 flex items-center justify-center">
+            <AlertCircle className="w-8 h-8 text-red-500" />
           </div>
-          <div className="space-y-1">
-            <h3 className="text-base font-semibold text-foreground font-mono">SCAN FAILED</h3>
-            <p className="text-xs text-muted-foreground">
-              Unable to connect to marketplace scanners. Rate limits or service issues.
+          <div className="space-y-2">
+            <h3 className="text-xl font-semibold text-foreground">Scan Failed</h3>
+            <p className="text-muted-foreground">
+              Unable to connect to marketplace scanners. This may be due to rate limits or temporary service issues.
             </p>
           </div>
           <Button 
             onClick={() => scanMutation.mutate()}
-            className="rounded-md bg-primary text-primary-foreground hover:bg-primary/90 font-mono text-xs uppercase tracking-wider"
+            size="lg"
+            className="rounded-xl bg-foreground text-background hover:bg-foreground/90 px-8"
             data-testid="button-retry-scan"
           >
             <Activity className="w-4 h-4 mr-2" />
-            RETRY
+            Retry Scan
           </Button>
         </motion.div>
       )}
 
-      {/* Empty State - Terminal Design */}
+      {/* Empty State - Compact Mobile-First Design */}
       {assets.length === 0 && !isScanning && !scanError && (
         <motion.div 
           initial={{ opacity: 0, y: 10 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.3 }}
-          className="py-4 md:py-6 max-w-xl mx-auto"
+          className="py-4 md:py-8 max-w-2xl mx-auto"
         >
-          {/* Terminal glass card for empty state */}
-          <div className="glass-terminal rounded-lg p-4 space-y-4">
+          {/* Compact glass card for empty state */}
+          <div className="glass-card rounded-2xl p-4 md:p-6 space-y-4">
             {/* Header row with icon and message */}
-            <div className="flex items-center gap-3">
-              <div className="w-10 h-10 shrink-0 rounded-md bg-primary/15 border border-primary/25 flex items-center justify-center">
-                <Target className="w-5 h-5 text-primary" />
+            <div className="flex items-center gap-3 md:gap-4">
+              <div className="w-10 h-10 md:w-12 md:h-12 shrink-0 rounded-xl bg-gradient-to-br from-primary/10 to-accent/10 flex items-center justify-center border border-border/30">
+                <Target className="w-5 h-5 md:w-6 md:h-6 text-primary" />
               </div>
               <div className="flex-1 min-w-0">
-                <h2 className="text-sm font-semibold text-foreground font-mono uppercase">READY TO SCAN</h2>
-                <p className="text-xs text-muted-foreground">
-                  Enter a niche above or select quick start
+                <h2 className="text-base md:text-lg font-semibold text-foreground">Ready to Hunt</h2>
+                <p className="text-sm text-muted-foreground truncate">
+                  Enter a niche to scan 14 marketplaces
                 </p>
               </div>
             </div>
             
             {/* Quick start pills - inline compact */}
             <div className="space-y-2">
-              <p className="text-[10px] text-muted-foreground uppercase tracking-widest font-mono">QUICK START</p>
+              <p className="text-xs text-muted-foreground uppercase tracking-wider">Quick start</p>
               <div className="flex flex-wrap gap-2">
                 {["productivity", "analytics", "crm", "email", "seo"].map((niche) => (
                   <button
@@ -1036,7 +999,7 @@ export default function Hunt() {
                       setQuery(niche);
                       triggerScan(niche);
                     }}
-                    className="px-2.5 py-1 rounded-md glass-card text-[10px] font-mono uppercase tracking-wider text-foreground hover:border-primary/50 hover:bg-primary/10 transition-all"
+                    className="px-3 py-1.5 rounded-full glass border border-border/40 text-xs font-medium text-foreground hover:border-primary/50 hover:bg-primary/5 transition-all"
                     data-testid={`button-niche-${niche}`}
                   >
                     {niche}
@@ -1046,7 +1009,7 @@ export default function Hunt() {
             </div>
             
             {/* Action buttons row */}
-            <div className="flex flex-wrap gap-2 pt-3 border-t border-white/5">
+            <div className="flex flex-wrap gap-2 pt-2 border-t border-border/20">
               <Button
                 variant="outline"
                 size="sm"
@@ -1054,21 +1017,21 @@ export default function Hunt() {
                   setQuery("calendar");
                   triggerScan("calendar");
                 }}
-                className="rounded-md font-mono text-[10px] uppercase tracking-wider"
+                className="rounded-xl text-xs"
                 data-testid="button-sample-scan"
               >
                 <Zap className="w-3 h-3 mr-1.5" />
-                DEMO SCAN
+                Sample Scan
               </Button>
               <Link to="/watchlist">
                 <Button
                   variant="ghost"
                   size="sm"
-                  className="rounded-md font-mono text-[10px] uppercase tracking-wider"
+                  className="rounded-xl text-xs"
                   data-testid="button-view-watchlist"
                 >
                   <Eye className="w-3 h-3 mr-1.5" />
-                  WATCHLIST
+                  View Watchlist
                 </Button>
               </Link>
             </div>
@@ -1076,53 +1039,52 @@ export default function Hunt() {
         </motion.div>
       )}
 
-      {/* Filter/Sort Controls - Terminal styling */}
+      {/* Filter/Sort Controls - Only show when we have results */}
       {assets.length > 0 && (
         <motion.div
           initial={{ opacity: 0, y: 10 }}
           animate={{ opacity: 1, y: 0 }}
-          className="space-y-3"
+          className="space-y-4"
         >
           {/* Filter Bar */}
-          <div className="flex flex-wrap items-center gap-2">
+          <div className="flex flex-wrap items-center gap-3">
             {/* Sort Dropdown */}
             <Select value={sortBy} onValueChange={(v) => setSortBy(v as SortOption)}>
-              <SelectTrigger className="w-[160px] h-9 rounded-md border-white/10 bg-white/5 font-mono text-[10px] uppercase tracking-wider" data-testid="select-sort">
-                <ArrowUpDown className="w-3 h-3 mr-2 text-muted-foreground" />
-                <SelectValue placeholder="SORT" />
+              <SelectTrigger className="w-[180px] rounded-2xl" data-testid="select-sort">
+                <ArrowUpDown className="w-4 h-4 mr-2 text-muted-foreground" />
+                <SelectValue placeholder="Sort by..." />
               </SelectTrigger>
-              <SelectContent className="rounded-md glass-terminal font-mono text-xs">
-                <SelectItem value="distress_desc">DISTRESS (HIGH)</SelectItem>
-                <SelectItem value="mrr_desc">MRR (HIGH)</SelectItem>
-                <SelectItem value="users_desc">USERS (HIGH)</SelectItem>
-                <SelectItem value="name_asc">NAME (A-Z)</SelectItem>
+              <SelectContent className="rounded-2xl">
+                <SelectItem value="distress_desc">Distress Score (High)</SelectItem>
+                <SelectItem value="mrr_desc">MRR Potential (High)</SelectItem>
+                <SelectItem value="users_desc">Users (High)</SelectItem>
+                <SelectItem value="name_asc">Name (A-Z)</SelectItem>
               </SelectContent>
             </Select>
             
             {/* Status Filter */}
             <Select value={statusFilter} onValueChange={(v) => setStatusFilter(v as StatusFilter)}>
-              <SelectTrigger className="w-[120px] h-9 rounded-md border-white/10 bg-white/5 font-mono text-[10px] uppercase tracking-wider" data-testid="select-status">
-                <SelectValue placeholder="STATUS" />
+              <SelectTrigger className="w-[140px] rounded-2xl" data-testid="select-status">
+                <SelectValue placeholder="Status" />
               </SelectTrigger>
-              <SelectContent className="rounded-md glass-terminal font-mono text-xs">
-                <SelectItem value="all">ALL</SelectItem>
-                <SelectItem value="for_sale">FOR SALE</SelectItem>
-                <SelectItem value="distressed">DISTRESSED</SelectItem>
+              <SelectContent className="rounded-2xl">
+                <SelectItem value="all">All Status</SelectItem>
+                <SelectItem value="for_sale">For Sale</SelectItem>
+                <SelectItem value="distressed">Distressed</SelectItem>
               </SelectContent>
             </Select>
             
             {/* Filter Toggle */}
             <Button 
               variant={showFilters ? "secondary" : "outline"}
-              size="sm"
+              size="default"
               onClick={() => setShowFilters(!showFilters)}
-              className="h-9 rounded-md font-mono text-[10px] uppercase tracking-wider"
               data-testid="button-toggle-filters"
             >
-              <SlidersHorizontal className="w-3 h-3 mr-2" />
-              FILTERS
+              <SlidersHorizontal className="w-4 h-4 mr-2" />
+              Filters
               {hasActiveFilters && (
-                <Badge variant="secondary" className="ml-2 bg-primary/20 text-primary font-mono text-[9px]">
+                <Badge variant="secondary" className="ml-2 bg-primary/20 text-primary">
                   {marketplaceFilters.length + (minDistressScore > 0 ? 1 : 0) + (minMrr > 0 ? 1 : 0) + (minUsers > 0 ? 1 : 0)}
                 </Badge>
               )}
@@ -1134,21 +1096,20 @@ export default function Hunt() {
                 variant="ghost" 
                 size="sm" 
                 onClick={clearAllFilters}
-                className="h-9 rounded-md font-mono text-[10px] uppercase tracking-wider"
                 data-testid="button-clear-filters"
               >
-                <X className="w-3 h-3 mr-1" />
-                CLEAR
+                <X className="w-4 h-4 mr-1" />
+                Clear all
               </Button>
             )}
             
             {/* Results Count */}
-            <div className="ml-auto text-[10px] font-mono text-muted-foreground uppercase tracking-wider">
-              {filteredAssets.length}/{assets.length} ASSETS
+            <div className="ml-auto text-sm text-muted-foreground">
+              {filteredAssets.length} of {assets.length} assets
             </div>
           </div>
           
-          {/* Expanded Filter Panel - Terminal styling */}
+          {/* Expanded Filter Panel */}
           <AnimatePresence>
             {showFilters && (
               <motion.div
@@ -1157,16 +1118,16 @@ export default function Hunt() {
                 exit={{ opacity: 0, height: 0 }}
                 className="overflow-hidden"
               >
-                <div className="glass-terminal rounded-lg p-4 space-y-4">
+                <Card className="p-4 space-y-4">
                   {/* Marketplace Filters */}
                   <div>
-                    <Label className="text-[10px] font-mono uppercase tracking-widest text-muted-foreground mb-2 block">MARKETPLACES</Label>
-                    <div className="flex flex-wrap gap-1.5">
+                    <Label className="text-sm font-medium mb-2 block">Marketplaces</Label>
+                    <div className="flex flex-wrap gap-2">
                       {ALL_MARKETPLACES.map(marketplace => (
                         <Badge 
                           key={marketplace}
                           variant={marketplaceFilters.includes(marketplace) ? "default" : "outline"}
-                          className={`cursor-pointer transition-colors font-mono text-[9px] rounded-md ${marketplaceFilters.includes(marketplace) ? "" : "hover:bg-white/5"}`}
+                          className={`cursor-pointer transition-colors ${marketplaceFilters.includes(marketplace) ? "" : "hover:bg-muted"}`}
                           onClick={() => toggleMarketplaceFilter(marketplace)}
                           data-testid={`filter-marketplace-${marketplace}`}
                         >
@@ -1180,8 +1141,8 @@ export default function Hunt() {
                   <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                     {/* Min Distress Score */}
                     <div>
-                      <Label className="text-[10px] font-mono uppercase tracking-widest text-muted-foreground mb-2 block">
-                        MIN DISTRESS: {minDistressScore}
+                      <Label className="text-sm font-medium mb-2 block">
+                        Min Distress Score: {minDistressScore}
                       </Label>
                       <Slider
                         value={[minDistressScore]}
@@ -1195,8 +1156,8 @@ export default function Hunt() {
                     
                     {/* Min MRR */}
                     <div>
-                      <Label className="text-[10px] font-mono uppercase tracking-widest text-muted-foreground mb-2 block">
-                        MIN MRR: ${minMrr.toLocaleString()}
+                      <Label className="text-sm font-medium mb-2 block">
+                        Min MRR: ${minMrr.toLocaleString()}
                       </Label>
                       <Slider
                         value={[minMrr]}
@@ -1210,8 +1171,8 @@ export default function Hunt() {
                     
                     {/* Min Users */}
                     <div>
-                      <Label className="text-[10px] font-mono uppercase tracking-widest text-muted-foreground mb-2 block">
-                        MIN USERS: {minUsers.toLocaleString()}
+                      <Label className="text-sm font-medium mb-2 block">
+                        Min Users: {minUsers.toLocaleString()}
                       </Label>
                       <Slider
                         value={[minUsers]}
@@ -1223,63 +1184,63 @@ export default function Hunt() {
                       />
                     </div>
                   </div>
-                </div>
+                </Card>
               </motion.div>
             )}
           </AnimatePresence>
           
           {/* Active Filter Chips */}
           {hasActiveFilters && (
-            <div className="flex flex-wrap gap-1.5">
+            <div className="flex flex-wrap gap-2">
               {marketplaceFilters.map(m => (
                 <Badge 
                   key={m} 
                   variant="secondary" 
-                  className="cursor-pointer gap-1 font-mono text-[9px] uppercase rounded-md"
+                  className="cursor-pointer gap-1"
                   onClick={() => toggleMarketplaceFilter(m)}
                 >
                   {TYPE_LABELS[m] || m}
-                  <X className="w-2.5 h-2.5" />
+                  <X className="w-3 h-3" />
                 </Badge>
               ))}
               {statusFilter !== 'all' && (
                 <Badge 
                   variant="secondary" 
-                  className="cursor-pointer gap-1 font-mono text-[9px] uppercase rounded-md"
+                  className="cursor-pointer gap-1"
                   onClick={() => setStatusFilter('all')}
                 >
-                  {statusFilter === 'for_sale' ? 'FOR SALE' : 'DISTRESSED'}
-                  <X className="w-2.5 h-2.5" />
+                  {statusFilter === 'for_sale' ? 'For Sale' : 'Distressed'}
+                  <X className="w-3 h-3" />
                 </Badge>
               )}
               {minDistressScore > 0 && (
                 <Badge 
                   variant="secondary" 
-                  className="cursor-pointer gap-1 font-mono text-[9px] uppercase rounded-md"
+                  className="cursor-pointer gap-1"
                   onClick={() => setMinDistressScore(0)}
                 >
-                  DIST {minDistressScore}+
-                  <X className="w-2.5 h-2.5" />
+                  Distress {minDistressScore}+
+                  <X className="w-3 h-3" />
                 </Badge>
               )}
               {minMrr > 0 && (
                 <Badge 
                   variant="secondary" 
-                  className="cursor-pointer gap-1 font-mono text-[9px] uppercase rounded-md"
+                  className="cursor-pointer gap-1"
                   onClick={() => setMinMrr(0)}
                 >
                   MRR ${minMrr.toLocaleString()}+
-                  <X className="w-2.5 h-2.5" />
+                  <X className="w-3 h-3" />
                 </Badge>
               )}
               {minUsers > 0 && (
                 <Badge 
                   variant="secondary" 
-                  className="cursor-pointer gap-1 font-mono text-[9px] uppercase rounded-md"
+                  className="cursor-pointer gap-1"
                   onClick={() => setMinUsers(0)}
                 >
-                  USERS {minUsers.toLocaleString()}+
-                  <X className="w-2.5 h-2.5" />
+                  Users {minUsers.toLocaleString()}+
+                  <X className="w-3 h-3" />
                 </Badge>
               )}
             </div>
@@ -1287,116 +1248,113 @@ export default function Hunt() {
         </motion.div>
       )}
 
-      {/* Zero State - Terminal styling */}
+      {/* Zero State - When filters result in no matches */}
       {assets.length > 0 && filteredAssets.length === 0 && (
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
-          className="text-center py-10"
+          className="text-center py-16"
         >
-          <div className="inline-flex items-center justify-center w-12 h-12 rounded-md bg-white/5 border border-white/10 mb-3">
-            <Filter className="w-6 h-6 text-muted-foreground" />
+          <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-muted mb-4">
+            <Filter className="w-8 h-8 text-muted-foreground" />
           </div>
-          <h3 className="text-sm font-semibold font-mono uppercase mb-1">NO MATCHES</h3>
-          <p className="text-xs text-muted-foreground mb-3">Adjust filter criteria</p>
-          <Button variant="outline" size="sm" className="rounded-md font-mono text-[10px] uppercase tracking-wider" onClick={clearAllFilters} data-testid="button-clear-filters-empty">
-            <X className="w-3 h-3 mr-1" />
-            CLEAR FILTERS
+          <h3 className="text-lg font-semibold mb-2">No assets match your filters</h3>
+          <p className="text-muted-foreground mb-4">Try adjusting your filter criteria to see more results.</p>
+          <Button variant="outline" onClick={clearAllFilters} data-testid="button-clear-filters-empty">
+            <X className="w-4 h-4 mr-2" />
+            Clear all filters
           </Button>
         </motion.div>
       )}
 
-      {/* Results Grid - Alpha Feed */}
+      {/* Results Grid */}
       <AnimatePresence>
         {filteredAssets.length > 0 && (
           <motion.div
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
-            className="grid grid-cols-1 lg:grid-cols-2 gap-3"
+            className="grid grid-cols-1 lg:grid-cols-2 gap-4"
           >
             {filteredAssets.map((asset, index) => (
               <motion.div
                 key={asset.id}
                 initial={{ opacity: 0, y: 10 }}
                 animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: index * 0.015 }}
+                transition={{ delay: index * 0.02 }}
               >
-                {/* Terminal Asset Card with glassmorphism */}
+                {/* Dark Terminal Asset Card - SWS product preview style */}
                 <div 
-                  className={`p-4 h-full flex flex-col glass-card rounded-lg cursor-pointer hover:border-primary/40 transition-all ${!isPro ? 'relative overflow-hidden' : ''}`}
+                  className="p-5 h-full flex flex-col bg-[hsl(var(--panel))] border border-[hsl(var(--panel-foreground))]/10 cursor-pointer hover:border-primary/40 transition-colors"
                   onClick={() => handleAnalyze(asset)}
                   data-testid={`card-asset-${index}`}
                 >
-                  {/* Blur overlay for non-premium users on select cards */}
-                  {!isPro && index >= 3 && (
-                    <div className="absolute inset-0 backdrop-blur-sm bg-background/40 z-10 flex items-center justify-center rounded-lg">
-                      <div className="text-center p-4">
-                        <Lock className="w-5 h-5 mx-auto mb-2 text-primary" />
-                        <p className="text-xs font-mono text-muted-foreground">UNLOCK FULL ACCESS</p>
-                      </div>
-                    </div>
-                  )}
-                  
-                  <div className="flex items-start justify-between gap-2 mb-2">
-                    <div className="flex items-center gap-2 flex-wrap">
-                      <span className="text-[10px] text-primary uppercase tracking-widest font-mono">
+                  <div className="flex items-start justify-between gap-2 mb-3">
+                    <div className="flex items-center gap-3 flex-wrap">
+                      <span className="text-[10px] text-primary uppercase tracking-widest font-medium">
                         {TYPE_LABELS[asset._marketplaceKey] || asset._marketplaceKey}
                       </span>
-                      <span className="px-1.5 py-0.5 rounded text-[9px] bg-primary/15 text-primary font-mono">
-                        {asset._distressScore}
+                      <span className="text-[10px] text-accent uppercase tracking-widest font-mono">
+                        Score {asset._distressScore}
                       </span>
                     </div>
-                    <span className="text-sm font-bold text-primary font-mono shrink-0">
-                      ${asset.mrr_potential.toLocaleString()}
+                    <span className="text-sm font-semibold text-accent font-mono shrink-0">
+                      ${asset.mrr_potential.toLocaleString()}/mo
                     </span>
                   </div>
                   
-                  <h3 className="font-semibold text-sm text-foreground mb-1.5 line-clamp-1">
-                    {(isAuthenticated || isPro) ? cleanAssetName(asset.name) : (
+                  <h3 className="font-semibold text-base text-[hsl(var(--panel-foreground))] mb-2 line-clamp-2">
+                    {isPro ? cleanAssetName(asset.name) : (
                       <span className="flex items-center gap-2">
-                        <Lock className="w-3 h-3 text-muted-foreground" />
+                        <Lock className="w-3 h-3 text-[hsl(var(--panel-foreground))]/40" />
                         {getAssetDisplayName(asset, isPro, index)}
                       </span>
                     )}
                   </h3>
-                  <p className="text-xs text-muted-foreground mb-2 line-clamp-2">{sanitizeDescription(asset.description, asset.name, isAuthenticated || isPro)}</p>
+                  <p className="text-sm text-[hsl(var(--panel-foreground))]/60 mb-3 line-clamp-2">{sanitizeDescription(asset.description, asset.name, isPro)}</p>
                   
-                  <div className="flex items-center justify-between text-xs mb-2">
-                    <div className="flex items-center gap-3 text-muted-foreground">
+                  <div className="flex items-center justify-between text-sm mb-3">
+                    <div className="flex items-center gap-4 text-[hsl(var(--panel-foreground))]/60">
                       <div className="flex items-center gap-1">
-                        <Users className="w-3 h-3" />
+                        <Users className="w-4 h-4" />
                         <span className="font-mono">{asset.user_count.toLocaleString()}</span>
                       </div>
+                      <div className="flex items-center gap-1 text-accent" title="Interest level">
+                        <Activity className="w-3 h-3" />
+                        <span className="text-xs font-mono">{Math.min(5, Math.max(1, Math.floor(asset._distressScore / 20)))}</span>
+                      </div>
                     </div>
-                    <span className={`text-[9px] uppercase tracking-wider font-mono ${asset.status === "for_sale" ? "text-primary" : "text-muted-foreground"}`}>
-                      {asset.status === "for_sale" ? "FOR SALE" : "DISTRESSED"}
+                    <span className={`text-[10px] uppercase tracking-widest ${asset.status === "for_sale" ? "text-primary" : "text-accent"}`}>
+                      {asset.status === "for_sale" ? "For Sale" : "Distressed"}
                     </span>
                   </div>
 
-                  <div className="bg-primary/5 border border-primary/15 rounded px-2 py-1.5 mb-2">
-                    <p className="text-primary text-[10px] font-mono line-clamp-1">{asset.details}</p>
+                  <div className="bg-accent/10 border border-accent/20 px-3 py-2 mb-3">
+                    <p className="text-accent text-xs">{asset.details}</p>
                   </div>
 
-                  <div className="mt-auto flex items-center justify-between pt-2 border-t border-white/5">
-                    {(isAuthenticated || isPro) ? (
+                  <div className="mt-auto flex items-center justify-between">
+                    {isPro ? (
                       <a 
                         href={asset.url} 
                         target="_blank" 
                         rel="noreferrer"
-                        className="text-[10px] text-muted-foreground hover:text-primary flex items-center gap-1 font-mono"
+                        className="text-xs text-[hsl(var(--panel-foreground))]/50 hover:text-primary flex items-center gap-1"
                         onClick={(e) => e.stopPropagation()}
                       >
                         <ExternalLink className="w-3 h-3" />
-                        VIEW
+                        View Listing
                       </a>
                     ) : (
-                      <span className="text-[10px] text-muted-foreground/50 flex items-center gap-1 font-mono">
+                      <span 
+                        className="text-xs text-[hsl(var(--panel-foreground))]/30 flex items-center gap-1 cursor-not-allowed"
+                        title="Upgrade to view listing URL"
+                      >
                         <Lock className="w-3 h-3" />
-                        LOCKED
+                        URL Hidden
                       </span>
                     )}
-                    <Button size="sm" variant="ghost" className="text-[10px] font-mono h-7 px-2">
-                      ANALYZE <ChevronRight className="w-3 h-3 ml-1" />
+                    <Button size="sm" variant="ghost" className="text-xs text-[hsl(var(--panel-foreground))]">
+                      Analyze <ChevronRight className="w-3 h-3 ml-1" />
                     </Button>
                   </div>
                 </div>

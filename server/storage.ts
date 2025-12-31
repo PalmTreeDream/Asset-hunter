@@ -9,12 +9,13 @@ import {
   weeklyStats,
   magicLinkTokens,
   contactSubmissions,
+  savedAssets,
   type Lead,
   type InsertLead,
   type UpdateLeadRequest,
   type Insight,
   type User,
-  type UpsertUser,
+  type InsertUser,
   type NewsletterSignup,
   type InsertNewsletterSignup,
   type NewsletterSubscription,
@@ -27,6 +28,8 @@ import {
   type InsertMagicLinkToken,
   type ContactSubmission,
   type InsertContactSubmission,
+  type SavedAsset,
+  type InsertSavedAsset,
 } from "@shared/schema";
 import { eq, desc, sql, and, isNull, gt } from "drizzle-orm";
 
@@ -43,7 +46,7 @@ export interface IStorage {
   // User operations
   getUser(id: string): Promise<User | undefined>;
   getUserByEmail(email: string): Promise<User | undefined>;
-  createUser(user: UpsertUser): Promise<User>;
+  createUser(user: InsertUser): Promise<User>;
   updateUserStripeInfo(userId: string, info: { stripeCustomerId?: string; stripeSubscriptionId?: string; plan?: string }): Promise<User>;
   
   // Newsletter operations
@@ -82,6 +85,12 @@ export interface IStorage {
   
   // Contact form operations
   createContactSubmission(submission: InsertContactSubmission): Promise<ContactSubmission>;
+  
+  // Saved assets (watchlist) operations
+  saveAsset(asset: InsertSavedAsset): Promise<SavedAsset>;
+  unsaveAsset(userId: string, assetId: string): Promise<void>;
+  getSavedAssets(userId: string): Promise<SavedAsset[]>;
+  isAssetSaved(userId: string, assetId: string): Promise<boolean>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -139,7 +148,7 @@ export class DatabaseStorage implements IStorage {
     return user;
   }
 
-  async createUser(user: UpsertUser): Promise<User> {
+  async createUser(user: InsertUser): Promise<User> {
     const [created] = await db.insert(users).values(user).returning();
     return created;
   }
@@ -335,6 +344,49 @@ export class DatabaseStorage implements IStorage {
   async createContactSubmission(submission: InsertContactSubmission): Promise<ContactSubmission> {
     const [created] = await db.insert(contactSubmissions).values(submission).returning();
     return created;
+  }
+  
+  // Saved assets (watchlist) operations
+  async saveAsset(asset: InsertSavedAsset): Promise<SavedAsset> {
+    // Check if already saved
+    const existing = await this.isAssetSaved(asset.userId, asset.assetId);
+    if (existing) {
+      // Return existing record
+      const [found] = await db.select().from(savedAssets).where(
+        and(
+          eq(savedAssets.userId, asset.userId),
+          eq(savedAssets.assetId, asset.assetId)
+        )
+      );
+      return found;
+    }
+    const [created] = await db.insert(savedAssets).values(asset).returning();
+    return created;
+  }
+  
+  async unsaveAsset(userId: string, assetId: string): Promise<void> {
+    await db.delete(savedAssets).where(
+      and(
+        eq(savedAssets.userId, userId),
+        eq(savedAssets.assetId, assetId)
+      )
+    );
+  }
+  
+  async getSavedAssets(userId: string): Promise<SavedAsset[]> {
+    return await db.select().from(savedAssets)
+      .where(eq(savedAssets.userId, userId))
+      .orderBy(desc(savedAssets.createdAt));
+  }
+  
+  async isAssetSaved(userId: string, assetId: string): Promise<boolean> {
+    const [found] = await db.select().from(savedAssets).where(
+      and(
+        eq(savedAssets.userId, userId),
+        eq(savedAssets.assetId, assetId)
+      )
+    );
+    return !!found;
   }
 }
 

@@ -1,125 +1,64 @@
 # AssetHunter Design Guidelines
 
-## Design Philosophy
-Inspired by Acquire.com's clean, professional marketplace design. Trust-focused aesthetic with indigo (#4F46E5) as the primary accent color. Clean white backgrounds, subtle slate-200 borders, minimal shadows, and 10px border radius throughout. No glassmorphism - flat, clean design only.
-
-## Brand Colors
-
-### Primary Palette
-- **Primary Accent (Indigo):** #4F46E5 (indigo-600) - CTAs, active states, links
-- **Primary Dark:** #4338CA (indigo-700) - Hover states
-- **Primary Light:** #EEF2FF (indigo-50) - Subtle backgrounds, badges
-- **Background:** #FFFFFF (white)
-- **Surface:** #FFFFFF with border-slate-200
-- **Text Primary:** #0F172A (slate-900)
-- **Text Secondary:** #64748B (slate-500)
-- **Text Muted:** #94A3B8 (slate-400)
-
-### Accent Colors
-- **Category Badge:** bg-indigo-50 text-indigo-700
-- **Success:** #10B981 (green-500)
-- **Warning:** #F59E0B (amber-500)
-- **Error:** #EF4444 (red-500)
-- **Info:** #3B82F6 (blue-500)
+## Design Approach
+Reference-based design inspired by Stripe and Linear, emphasizing data clarity through glassmorphism and sophisticated typography. Clean, professional aesthetic that balances visual polish with information density.
 
 ## Typography System
-**Font Family:** Inter (system-ui fallback)
-- **Hero Headlines:** 48-64px, weight 700, tight tracking, slate-900
-- **Section Headers:** 36-48px, weight 700, line-height 1.2
-- **Subheadings:** 24-32px, weight 600
-- **Card Titles:** 18-20px, weight 600
-- **Body Text:** 16px, weight 400, line-height 1.6
-- **Small/Labels:** 14px, weight 500
-- **Caption:** 12px, weight 400, muted
+**Font Family:** Inter (Google Fonts)
+- Hero/Display: 48-72px, weight 700, tight leading (1.1)
+- Section Headers: 32-40px, weight 600
+- Card Titles: 20-24px, weight 600
+- Body Text: 16px, weight 400, line-height 1.6
+- Data Labels: 14px, weight 500, uppercase tracking
+- Caption/Meta: 12px, weight 400, muted
 
 ## Layout & Spacing
-- **Container:** max-w-7xl centered with px-4 sm:px-6 lg:px-8
-- **Section Padding:** py-20 lg:py-32
-- **Card Padding:** p-6 lg:p-8
-- **Grid Gaps:** gap-6 lg:gap-8
-- **Border Radius:** rounded-xl (0.625rem / 10px)
+**Tailwind Units:** Consistently use 4, 8, 12, 16, 24, 32 for spacing (p-4, gap-8, mb-12, etc.)
+- Container: max-w-7xl with px-4 md:px-8
+- Section Padding: py-16 md:py-24 lg:py-32
+- Card Padding: p-6 md:p-8
+- Grid Gaps: gap-6 md:gap-8
 
-## Core Components
+## Component Library
 
 ### Navigation
-Sticky top bar with white background, subtle shadow-sm on scroll. Logo left, nav links center, CTA right. Clean minimal design.
+Top navigation bar with frosted glass effect, sticky positioning. Logo left, navigation center, CTA button right. Mobile: Hamburger menu with slide-in panel.
 
-### Hero Section
-- Large headline with clear value proposition
-- Accent color on key phrase: text-indigo-600
-- Subheadline with key benefit
-- Dual CTAs: Primary (bg-indigo-600) + Secondary (variant="outline")
-- Trust metrics bar below CTAs
+### Hero Section (Full-width)
+Split layout: Left 60% - headline, subheadline, dual CTAs (emerald primary + outline secondary). Right 40% - large hero image showing dashboard preview or data visualization mockup. Buttons on image have backdrop-blur-md backgrounds.
 
-### Trust Metrics Bar
-Clean horizontal bar with key stats:
-- Pattern: border-y border-slate-200 bg-white py-6
-- Icon + bold number + label for each metric
-- Icons use text-indigo-600
-- Flex wrap with centered gap-8 lg:gap-16
+### Data Panels (Glassmorphism Cards)
+Dark panels (deep indigo background at 95% opacity) with backdrop-blur-lg, rounded-3xl (24px), subtle border (white 10% opacity), shadow-2xl. Float above white background. Include header with icon, title, and metadata row.
 
-### How It Works Section
-3-4 step process:
-- Step indicator: bg-indigo-50 text-indigo-600 rounded-xl icon container
-- Step number label: text-sm text-indigo-600
-- Title + description per step
+### Marketplace Listings
+Grid layout (grid-cols-1 md:grid-cols-2 lg:grid-cols-3) showing business cards. Each card: Company name, MRR gauge (circular progress), confidence badge (pill-shaped with viz colors), key metrics row, provenance indicator, and view details button.
 
-### Feature Cards
-- bg-white rounded-xl p-6
-- border border-slate-100
-- Subtle hover: hover:shadow-md transition-shadow
-- Icon container: bg-indigo-50 text-indigo-600 rounded-xl
+### Confidence Badges
+Pill-shaped indicators using visualization palette. High confidence: viz-green background with white text. Medium: viz-amber. Low: viz-red. Info: viz-blue. Include icon + text.
 
-### Asset/Listing Cards (Marketplace)
-- bg-white rounded-xl border border-slate-200 p-6
-- Hover state: hover:shadow-xl hover:border-indigo-200
-- MRR indicator: text-indigo-600 font-medium
-- Type badge: Badge variant="secondary"
+### Data Visualizations
+**Radar Charts:** Multi-axis evaluation (financials, tech stack, team, market). Canvas-based with viz palette.
+**MRR Gauges:** Semi-circular progress indicators with percentage center label and trend arrow.
+**Provenance Cards:** Timeline-style cards showing data source verification, timestamps, and confidence scores.
 
-### Pricing Cards
-- bg-white rounded-xl border border-slate-200 p-8
-- Featured tier: border-indigo-200 shadow-xl
-- Badge for featured: bg-indigo-600 text-white
-- Checkmarks: text-indigo-600
-- CTA: bg-indigo-600 hover:bg-indigo-700
+### Accordion Patterns (Mobile)
+Collapsible sections for filtering, advanced metrics, and deal details. Icon rotation on expand, smooth height transitions. Stacked on mobile, side-by-side panels on desktop.
 
-### CTA Section
-- Full-width: bg-indigo-600
-- White text headlines
-- Subtext: text-indigo-100
-- Button: bg-white text-indigo-600 hover:bg-indigo-50
+### Forms & Inputs
+Floating labels, rounded-2xl (16px) borders, focus states with emerald ring. Search bars prominently placed with glass morphism effect.
 
-### Footer
-- bg-slate-900 text-slate-400
-- Logo in white
-- Link hover: hover:text-white
+### CTAs
+Primary: Emerald background, white text, rounded-2xl, px-8 py-4, medium weight. Secondary: Outline with emerald border. Tertiary: Text-only emerald color.
 
-## Button Styles
-- **Primary:** bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg
-- **Secondary/Outline:** border border-slate-300 text-slate-700
-- **Ghost:** text-slate-600 hover:text-slate-900
-- NO custom hover state implementations - use built-in component hover
+## Visualization Color Palette
+- viz-green: #10B981 (success metrics, high confidence)
+- viz-amber: #F59E0B (warnings, medium confidence)
+- viz-red: #EF4444 (risks, low confidence)
+- viz-blue: #3B82F6 (informational data)
 
-## Card Hover Patterns (Acquire.com Style)
-- Default: border-slate-200
-- Hover: hover:shadow-xl hover:border-indigo-200 transition-all
-- No heavy glow effects or glassmorphism
-- Subtle translateY(-4px) on hover is acceptable
+## Images
+**Hero Image:** Large, high-quality screenshot of platform dashboard showing data panels, charts, and marketplace UI. Position right side of hero section, slightly elevated with subtle shadow. Full-bleed on mobile.
 
-## Logo
-- Indigo "A" with crossbar in #4F46E5 on navy #0F1729 background
-- 10px border radius (rounded-xl for larger)
-- White strokes for the A letter
+**Section Images:** Dashboard previews, chart examples, data visualization samples throughout feature sections. Use glassmorphic frames around screenshots.
 
-## Dark Mode (App Interior Only)
-For authenticated app pages (Hunt, Dashboard):
-- Background: slate-950 (#020617)
-- Keep indigo-600 accent
-- High contrast text
-- Marketing pages (/, /feed) stay light theme
-
-## Animations
-- Subtle hover transitions (200ms)
-- Smooth scroll for anchor links
-- Fade-in-up for section reveals (framer-motion)
-- No excessive movement or glassmorphism effects
+**Background Treatments:** Subtle gradient meshes (indigo to white) in hero, pure white elsewhere to emphasize floating dark panels.

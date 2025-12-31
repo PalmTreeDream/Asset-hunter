@@ -7,7 +7,7 @@ import axios from "axios";
 import { GoogleGenAI } from "@google/genai";
 import { Resend } from "resend";
 import { MARKETPLACE_CONFIDENCE, MRR_FORMULAS } from "./hunter-intelligence";
-import { scrapeAllMarketplaces, getFallbackAssets, type ScrapedAsset } from "./direct-scrapers";
+import { pythonEngine } from "./python-client";
 
 // Extend express-session with our custom session data
 declare module 'express-session' {
@@ -72,10 +72,10 @@ function setCachedSerpResults(key: string, results: any[]): void {
 
 // Daily scan rate limits by tier
 const SCAN_LIMITS = {
-  free: 3,
-  scout: 10,
-  hunter: 50,
-  syndicate: 100
+  free: 10,  // Increased from 3 for demo
+  scout: 25,
+  hunter: 100,
+  syndicate: 500
 };
 
 // Seeded demo assets for Starter Scan (no API cost)
@@ -337,10 +337,20 @@ export async function registerRoutes(
 
   // === ASSET HUNTER BETA API ===
   // Multi-marketplace scanner for distressed digital assets
-  // Strategy: Direct Scraping -> SerpAPI Backup -> Fallback Demo Assets
   app.post("/api/scan", async (req, res) => {
     const { target_url, scan_type = "all" } = req.body;
     const apiKey = process.env.SERPAPI_KEY;
+
+    // For free users without API key, redirect to starter scan
+    if (!apiKey) {
+      // Fall back to demo results instead of error
+      const assets = getSeededAssets(target_url);
+      return res.json({
+        assets,
+        isDemo: true,
+        message: "Demo results - configure SERPAPI_KEY for live scans"
+      });
+    }
 
     // Rate limiting: Check daily scan count
     const today = new Date().toISOString().split('T')[0];
@@ -355,174 +365,658 @@ export async function registerRoutes(
     
     const dailyScans = req.session?.dailyScanCount || 0;
     
-    // Check if we have cached results first (saves scraping)
+    // Check if rate limited (skip for cached results)
     const cacheKey = getSerpCacheKey(target_url, scan_type);
     const cachedResults = getCachedSerpResults(cacheKey);
     
-    if (cachedResults && cachedResults.length > 0) {
-      console.log(`[Scan] Returning ${cachedResults.length} cached results for "${target_url}"`);
+    if (!cachedResults && dailyScans >= scanLimit) {
+      // Instead of blocking, return demo results with rate limit message
+      const demoAssets = getSeededAssets(target_url);
       return res.json({
-        assets: cachedResults,
-        isDemo: false,
-        isCached: true,
-        dailyScans,
-        scanLimit,
-        message: "Cached results (refreshes every 6 hours)"
-      });
-    }
-    
-    // Rate limit check for fresh scans
-    if (dailyScans >= scanLimit) {
-      return res.status(429).json({
-        message: `Daily scan limit reached (${scanLimit} scans). Upgrade for more scans or wait until tomorrow.`,
+        assets: demoAssets,
+        isDemo: true,
         rateLimited: true,
         dailyScans,
         scanLimit,
-        tier
+        tier,
+        message: `Daily scan limit reached (${scanLimit} scans). Showing demo results - upgrade for unlimited live scans.`
       });
     }
+
+    // Determine user's subscription tier for marketplace access
+    // Scout ($29) = excludes iOS & Play Store (12 marketplaces)
+    // Hunter ($99) / Syndicate ($249) = all 14 marketplaces
+    // For now, we treat all premium users as Hunter tier (full access)
+    const userEmail = req.session?.email;
+    let hasMobileAccess = true; // Allow all users to scan by default
+    
+    // Note: Tier-based marketplace restrictions will be enforced
+    // when Scout tier is explicitly detected via Stripe price lookup
 
     try {
-      // Increment scan count for fresh scans
+      // Check if we have cached results first (saves API calls)
+      if (cachedResults) {
+        console.log(`[SerpAPI] Returning ${cachedResults.length} cached results for "${target_url}"`);
+        return res.json({
+          assets: cachedResults,
+          isDemo: false,
+          isCached: true,
+          dailyScans,
+          scanLimit,
+          message: "Cached results (refreshes every 6 hours)"
+        });
+      }
+      
+      // Increment scan count for fresh API calls
       req.session!.dailyScanCount = dailyScans + 1;
       
-      console.log(`[Scan] Starting scan for: "${target_url}" (method: direct scraping + fallback)`);
-      
-      // STRATEGY 1: Try direct scraping first (FREE, no API costs)
-      let assets: ScrapedAsset[] = [];
-      try {
-        console.log(`[Scan] Attempting direct scraping across 14 marketplaces...`);
-        assets = await scrapeAllMarketplaces(target_url);
-        console.log(`[Scan] Direct scraping returned ${assets.length} results`);
-      } catch (scrapeError: any) {
-        console.error(`[Scan] Direct scraping failed:`, scrapeError.message);
-      }
-      
-      // STRATEGY 2: If direct scraping returned few results and SerpAPI is available, supplement
-      if (assets.length < 5 && apiKey) {
-        console.log(`[Scan] Supplementing with SerpAPI (found only ${assets.length} via scraping)...`);
+      const assets: any[] = [];
+      const scanPromises: Promise<void>[] = [];
+
+      // Helper to safely search via SerpAPI with per-query caching
+      const searchSerpApi = async (query: string): Promise<any[]> => {
         try {
-          const serpAssets = await searchSerpApiForAssets(target_url, apiKey);
-          const existingIds = new Set(assets.map(a => a.url));
-          const newAssets = serpAssets.filter(a => !existingIds.has(a.url));
-          assets = [...assets, ...newAssets];
-          console.log(`[Scan] SerpAPI added ${newAssets.length} additional results`);
-        } catch (serpError: any) {
-          console.error(`[Scan] SerpAPI supplement failed:`, serpError.message);
+          console.log(`[SerpAPI] Searching: ${query.substring(0, 80)}...`);
+          const result = await axios.get("https://serpapi.com/search.json", {
+            params: { engine: "google", q: query, api_key: apiKey, num: 15 },
+            timeout: 30000,
+          });
+          console.log(`[SerpAPI] Success: ${result.data.organic_results?.length || 0} results`);
+          return result.data.organic_results || [];
+        } catch (e: any) {
+          const errorMsg = e.response?.data?.error || e.message || 'Unknown error';
+          const status = e.response?.status || 'N/A';
+          console.error(`[SerpAPI] FAILED (${status}): ${query.substring(0, 50)}... - ${errorMsg}`);
+          return [];
         }
+      };
+
+      // URL validators to filter out articles and ensure actual marketplace listings
+      const isValidMarketplaceUrl = {
+        chrome: (url: string) => /chromewebstore\.google\.com\/detail\//.test(url),
+        firefox: (url: string) => /addons\.mozilla\.org\/.*\/addon\//.test(url),
+        shopify: (url: string) => /apps\.shopify\.com\/[a-z0-9-]+$/.test(url) && !/\/collections\/|\/categories\/|\/blog/.test(url),
+        wordpress: (url: string) => /wordpress\.org\/plugins\/[a-z0-9-]+\/?$/.test(url),
+        slack: (url: string) => /slack\.com\/apps\/[A-Z0-9]+/.test(url),
+        zapier: (url: string) => /zapier\.com\/apps\/[a-z0-9-]+\/integrations/.test(url),
+        producthunt: (url: string) => /producthunt\.com\/posts\/[a-z0-9-]+$/.test(url),
+        forsale: (url: string) => /(flippa\.com\/\d+|acquire\.com\/startups\/)/.test(url),
+        // New marketplaces
+        ios: (url: string) => /apps\.apple\.com\/.*\/app\//.test(url),
+        android: (url: string) => /play\.google\.com\/store\/apps\/details/.test(url),
+        microsoft: (url: string) => /apps\.microsoft\.com\/.*\/detail\//.test(url) || /microsoftedge\.microsoft\.com\/addons\/detail\//.test(url),
+        salesforce: (url: string) => /appexchange\.salesforce\.com\/appxListingDetail/.test(url),
+        atlassian: (url: string) => /marketplace\.atlassian\.com\/apps\//.test(url),
+        gumroad: (url: string) => /gumroad\.com\/l\//.test(url) || /[a-z0-9]+\.gumroad\.com/.test(url),
+      };
+
+      // Helper to parse Chrome extension results
+      const parseChromeResults = (results: any[], isDistressed: boolean) => {
+        return results
+          .filter((item: any) => isValidMarketplaceUrl.chrome(item.link || ""))
+          .map((item: any) => {
+            const userMatch = item.snippet?.match(/[\d,]+\s+users/i);
+            const userCount = userMatch ? parseInt(userMatch[0].replace(/\D/g, "")) : 1000;
+            return {
+              id: item.link,
+              name: item.title?.replace(" - Chrome Web Store", "") || "Unknown",
+              type: "chrome_extension",
+              url: item.link,
+              description: item.snippet?.substring(0, 150) || "No description",
+              revenue: `${userCount.toLocaleString()} users`,
+              details: isDistressed ? "DISTRESS: No updates in 6+ months. Manifest V2 migration risk." : "ACTIVE: Recently updated extension.",
+              status: isDistressed ? "distressed" : "active",
+              user_count: userCount,
+              marketplace: "Chrome Web Store",
+              mrr_potential: Math.round(userCount * 0.02 * 5),
+            };
+          });
+      };
+
+      // 1. Chrome Web Store Scanner
+      if (scan_type === "chrome" || scan_type === "all") {
+        scanPromises.push((async () => {
+          // First try distressed search
+          let results = await searchSerpApi(
+            `site:chromewebstore.google.com/detail "${target_url}" users -"updated 2025" -"updated 2024"`
+          );
+          console.log(`[SerpAPI] Chrome distressed results: ${results.length}`);
+          let parsed = parseChromeResults(results, true);
+          
+          // If no distressed results, try broader search (for popular terms like "cursor")
+          if (parsed.length === 0) {
+            results = await searchSerpApi(
+              `site:chromewebstore.google.com/detail "${target_url}" extension`
+            );
+            console.log(`[SerpAPI] Chrome broad results: ${results.length}`);
+            parsed = parseChromeResults(results, false);
+          }
+          
+          console.log(`[SerpAPI] Chrome parsed assets: ${parsed.length}`);
+          assets.push(...parsed);
+        })());
       }
-      
-      // STRATEGY 3: If still no results, use high-quality fallback demo data
-      if (assets.length === 0) {
-        console.log(`[Scan] No results from scraping/API, using curated fallback assets`);
-        assets = getFallbackAssets(target_url);
-        
-        // Cache fallback results too (so subsequent calls are fast)
-        setCachedSerpResults(cacheKey, assets);
-        
-        return res.json({
-          assets,
-          isDemo: true,
-          dailyScans: dailyScans + 1,
-          scanLimit,
-          message: "Showing curated distressed assets matching your search. Direct marketplace data temporarily unavailable."
-        });
+
+      // Helper to parse Firefox addon results
+      const parseFirefoxResults = (results: any[], isDistressed: boolean) => {
+        return results
+          .filter((item: any) => isValidMarketplaceUrl.firefox(item.link || ""))
+          .map((item: any) => {
+            const userMatch = item.snippet?.match(/[\d,]+\s+users/i);
+            const downloadMatch = item.snippet?.match(/[\d,]+\s+downloads?/i);
+            const userCount = userMatch ? parseInt(userMatch[0].replace(/\D/g, "")) : 
+                             downloadMatch ? parseInt(downloadMatch[0].replace(/\D/g, "")) : 1000;
+            return {
+              id: item.link,
+              name: item.title?.replace(/( – .*)$/, "") || "Unknown",
+              type: "firefox_addon",
+              url: item.link,
+              description: item.snippet?.substring(0, 150) || "No description",
+              revenue: `${userCount.toLocaleString()} users`,
+              details: isDistressed ? "DISTRESS: Stale Firefox addon. Cross-browser opportunity." : "ACTIVE: Recently updated addon.",
+              status: isDistressed ? "distressed" : "active",
+              user_count: userCount,
+              marketplace: "Firefox Add-ons",
+              mrr_potential: Math.round(userCount * 0.02 * 5),
+            };
+          });
+      };
+
+      // 2. Firefox Add-ons Scanner
+      if (scan_type === "firefox" || scan_type === "all") {
+        scanPromises.push((async () => {
+          let results = await searchSerpApi(
+            `site:addons.mozilla.org "${target_url}" users -"updated 2025" -"updated 2024"`
+          );
+          console.log(`[SerpAPI] Firefox distressed results: ${results.length}`);
+          let parsed = parseFirefoxResults(results, true);
+          
+          if (parsed.length === 0) {
+            results = await searchSerpApi(
+              `site:addons.mozilla.org "${target_url}" addon`
+            );
+            console.log(`[SerpAPI] Firefox broad results: ${results.length}`);
+            parsed = parseFirefoxResults(results, false);
+          }
+          
+          console.log(`[SerpAPI] Firefox parsed assets: ${parsed.length}`);
+          assets.push(...parsed);
+        })());
       }
+
+      // Helper to parse Shopify app results
+      const parseShopifyResults = (results: any[], isDistressed: boolean) => {
+        return results
+          .filter((item: any) => isValidMarketplaceUrl.shopify(item.link || ""))
+          .map((item: any) => {
+            const reviewMatch = item.snippet?.match(/[\d,]+\s*reviews?/i);
+            const reviewCount = reviewMatch ? parseInt(reviewMatch[0].replace(/\D/g, "")) : 20;
+            const estimatedUsers = reviewCount * 50;
+            return {
+              id: item.link,
+              name: item.title?.replace(/( - Shopify| \| Shopify)/gi, "") || "Unknown",
+              type: "shopify_app",
+              url: item.link,
+              description: item.snippet?.substring(0, 150) || "No description",
+              revenue: `~${estimatedUsers.toLocaleString()} installs`,
+              details: isDistressed ? "DISTRESS: Abandoned Shopify app. Merchant base opportunity." : "ACTIVE: Recently updated app.",
+              status: isDistressed ? "distressed" : "active",
+              user_count: estimatedUsers,
+              marketplace: "Shopify App Store",
+              mrr_potential: Math.round(estimatedUsers * 0.02 * 5),
+            };
+          });
+      };
+
+      // 3. Shopify App Store Scanner
+      if (scan_type === "shopify" || scan_type === "all") {
+        scanPromises.push((async () => {
+          let results = await searchSerpApi(
+            `site:apps.shopify.com "${target_url}" reviews -"updated 2025" -"new"`
+          );
+          console.log(`[SerpAPI] Shopify distressed results: ${results.length}`);
+          let parsed = parseShopifyResults(results, true);
+          
+          if (parsed.length === 0) {
+            results = await searchSerpApi(
+              `site:apps.shopify.com "${target_url}" app`
+            );
+            console.log(`[SerpAPI] Shopify broad results: ${results.length}`);
+            parsed = parseShopifyResults(results, false);
+          }
+          
+          console.log(`[SerpAPI] Shopify parsed assets: ${parsed.length}`);
+          assets.push(...parsed);
+        })());
+      }
+
+      // 4. WordPress Plugin Scanner
+      if (scan_type === "wordpress" || scan_type === "all") {
+        scanPromises.push((async () => {
+          const results = await searchSerpApi(
+            `site:wordpress.org/plugins "${target_url}" "active installations" -"updated 2025" -"updated 2024"`
+          );
+          const parsed = results
+            .filter((item: any) => isValidMarketplaceUrl.wordpress(item.link || ""))
+            .map((item: any) => {
+              const installMatch = item.snippet?.match(/[\d,]+\+?\s*active\s*install/i);
+              const installCount = installMatch ? parseInt(installMatch[0].replace(/\D/g, "")) : 0;
+              return {
+                id: item.link,
+                name: item.title?.replace(/ – WordPress plugin.*$/i, "") || "Unknown",
+                type: "wordpress_plugin",
+                url: item.link,
+                description: item.snippet?.substring(0, 150) || "No description",
+                revenue: `${installCount.toLocaleString()}+ active installs`,
+                details: "DISTRESS: Stale WordPress plugin. Huge PHP ecosystem.",
+                status: "distressed",
+                user_count: installCount,
+                marketplace: "WordPress.org",
+                mrr_potential: Math.round(installCount * 0.01 * 5),
+              };
+            }).filter((a: any) => a.user_count >= 1000);
+          assets.push(...parsed);
+        })());
+      }
+
+      // 5. Slack App Directory Scanner (filter by real metrics when available)
+      if (scan_type === "slack" || scan_type === "all") {
+        scanPromises.push((async () => {
+          const results = await searchSerpApi(
+            `site:slack.com/apps "${target_url}" installs OR users -"new" -"updated 2025"`
+          );
+          const parsed = results
+            .filter((item: any) => isValidMarketplaceUrl.slack(item.link || ""))
+            .map((item: any) => {
+              const installMatch = item.snippet?.match(/[\d,]+\s*(installs?|users?|workspaces?)/i);
+              const userCount = installMatch ? parseInt(installMatch[0].replace(/\D/g, "")) : 0;
+              return {
+                id: item.link,
+                name: item.title?.replace(/ \| Slack.*$/i, "") || "Unknown",
+                type: "slack_app",
+                url: item.link,
+                description: item.snippet?.substring(0, 150) || "No description",
+                revenue: userCount > 0 ? `${userCount.toLocaleString()}+ installs` : "Install count unavailable",
+                details: "DISTRESS: Slack integration opportunity. Enterprise B2B potential.",
+                status: "distressed",
+                user_count: userCount,
+                marketplace: "Slack App Directory",
+                mrr_potential: Math.round(userCount * 0.03 * 15),
+              };
+            }).filter((a: any) => a.user_count >= 1000);
+          assets.push(...parsed);
+        })());
+      }
+
+      // 6. Zapier Integration Scanner (filter by real metrics)
+      if (scan_type === "zapier" || scan_type === "all") {
+        scanPromises.push((async () => {
+          const results = await searchSerpApi(
+            `site:zapier.com/apps "${target_url}" users OR zaps -"new" -"updated 2025"`
+          );
+          const parsed = results
+            .filter((item: any) => isValidMarketplaceUrl.zapier(item.link || ""))
+            .map((item: any) => {
+              const userMatch = item.snippet?.match(/[\d,]+\s*(users?|zaps?)/i);
+              const userCount = userMatch ? parseInt(userMatch[0].replace(/\D/g, "")) : 0;
+              return {
+                id: item.link,
+                name: item.title?.replace(/ Integrations \|.*$/i, "").replace(/ \|.*$/i, "") || "Unknown",
+                type: "zapier_integration",
+                url: item.link,
+                description: item.snippet?.substring(0, 150) || "No description",
+                revenue: userCount > 0 ? `${userCount.toLocaleString()} users` : "Usage unavailable",
+                details: "DISTRESS: Zapier connector. Automation market opportunity.",
+                status: "distressed",
+                user_count: userCount,
+                marketplace: "Zapier",
+                mrr_potential: Math.round(userCount * 0.02 * 10),
+              };
+            }).filter((a: any) => a.user_count >= 1000);
+          assets.push(...parsed);
+        })());
+      }
+
+      // 7. Product Hunt Scanner (for SaaS products - only include with significant upvotes)
+      if (scan_type === "producthunt" || scan_type === "all") {
+        scanPromises.push((async () => {
+          const results = await searchSerpApi(
+            `site:producthunt.com/posts "${target_url}" upvotes -"2025" -"2024"`
+          );
+          const parsed = results
+            .filter((item: any) => isValidMarketplaceUrl.producthunt(item.link || ""))
+            .map((item: any) => {
+              const upvoteMatch = item.snippet?.match(/[\d,]+\s*upvotes?/i);
+              const upvotes = upvoteMatch ? parseInt(upvoteMatch[0].replace(/\D/g, "")) : 0;
+              return {
+                id: item.link,
+                name: item.title?.replace(/ - Product Hunt.*$/i, "") || "Unknown",
+                type: "saas_product",
+                url: item.link,
+                description: item.snippet?.substring(0, 150) || "No description",
+                revenue: upvotes > 0 ? `${upvotes.toLocaleString()} upvotes` : "Upvotes unavailable",
+                details: "DISTRESS: Abandoned SaaS. Product Hunt launch but no recent updates.",
+                status: "distressed",
+                user_count: upvotes,
+                marketplace: "Product Hunt",
+                mrr_potential: Math.round(upvotes * 0.05 * 20),
+              };
+            }).filter((a: any) => a.user_count >= 100);
+          assets.push(...parsed);
+        })());
+      }
+
+      // 8. Flippa/MicroAcquire Scanner (For-Sale SaaS)
+      if (scan_type === "forsale" || scan_type === "all") {
+        scanPromises.push((async () => {
+          const results = await searchSerpApi(
+            `(site:flippa.com OR site:acquire.com) "${target_url}" MRR OR revenue`
+          );
+          const parsed = results
+            .filter((item: any) => isValidMarketplaceUrl.forsale(item.link || ""))
+            .map((item: any) => {
+              const mrrMatch = item.snippet?.match(/\$[\d,]+\s*(mrr|\/mo|per month)/i);
+              const mrr = mrrMatch ? parseInt(mrrMatch[0].replace(/\D/g, "")) : 0;
+              const revenueMatch = item.snippet?.match(/\$[\d,]+\s*(arr|revenue|\/yr)/i);
+              const revenue = revenueMatch ? parseInt(revenueMatch[0].replace(/\D/g, "")) : mrr * 12;
+              return {
+                id: item.link,
+                name: item.title?.replace(/ for Sale.*$/i, "").replace(/ - Flippa.*$/i, "") || "Unknown",
+                type: "saas_forsale",
+                url: item.link,
+                description: item.snippet?.substring(0, 150) || "No description",
+                revenue: mrr > 0 ? `$${mrr.toLocaleString()}/mo MRR` : `$${revenue.toLocaleString()} revenue`,
+                details: "FOR SALE: Listed acquisition target. Verified MRR available.",
+                status: "for_sale",
+                user_count: mrr > 0 ? Math.round(mrr / 5 * 50) : 1000,
+                marketplace: item.link.includes("flippa") ? "Flippa" : "Acquire.com",
+                mrr_potential: mrr > 0 ? mrr : Math.round(revenue / 12),
+              };
+            }).filter((a: any) => a.mrr_potential > 0 || a.user_count >= 1000);
+          assets.push(...parsed);
+        })());
+      }
+
+      // 9. iOS App Store Scanner
+      if (scan_type === "ios" || scan_type === "all") {
+        scanPromises.push((async () => {
+          const results = await searchSerpApi(
+            `site:apps.apple.com "${target_url}" app -"updated 2025" -"updated 2024" ratings`
+          );
+          const parsed = results
+            .filter((item: any) => isValidMarketplaceUrl.ios(item.link || ""))
+            .map((item: any) => {
+              const ratingMatch = item.snippet?.match(/[\d,]+\s*ratings?/i);
+              const ratingCount = ratingMatch ? parseInt(ratingMatch[0].replace(/\D/g, "")) : 0;
+              const estimatedUsers = ratingCount * 100; // Rough estimate: 1 rating per 100 downloads
+              return {
+                id: item.link,
+                name: item.title?.replace(/ on the App Store.*$/i, "").replace(/ -.*$/i, "") || "Unknown",
+                type: "ios_app",
+                url: item.link,
+                description: item.snippet?.substring(0, 150) || "No description",
+                revenue: `~${estimatedUsers.toLocaleString()} downloads`,
+                details: "DISTRESS: Abandoned iOS app. Mobile distribution opportunity.",
+                status: "distressed",
+                user_count: estimatedUsers,
+                marketplace: "iOS App Store",
+                mrr_potential: Math.round(estimatedUsers * 0.01 * 3),
+              };
+            }).filter((a: any) => a.user_count >= 1000);
+          assets.push(...parsed);
+        })());
+      }
+
+      // 10. Google Play Store Scanner
+      if (scan_type === "android" || scan_type === "all") {
+        scanPromises.push((async () => {
+          const results = await searchSerpApi(
+            `site:play.google.com/store/apps "${target_url}" downloads -"updated 2025" -"updated 2024"`
+          );
+          const parsed = results
+            .filter((item: any) => isValidMarketplaceUrl.android(item.link || ""))
+            .map((item: any) => {
+              const downloadMatch = item.snippet?.match(/[\d,]+[KMB]?\+?\s*(downloads?|installs?)/i);
+              let downloadCount = 0;
+              if (downloadMatch) {
+                const numStr = downloadMatch[0].replace(/\D/g, "");
+                downloadCount = parseInt(numStr) || 0;
+                if (downloadMatch[0].includes("K")) downloadCount *= 1000;
+                if (downloadMatch[0].includes("M")) downloadCount *= 1000000;
+              }
+              return {
+                id: item.link,
+                name: item.title?.replace(/ - Apps on Google Play.*$/i, "").replace(/ -.*$/i, "") || "Unknown",
+                type: "android_app",
+                url: item.link,
+                description: item.snippet?.substring(0, 150) || "No description",
+                revenue: `${downloadCount.toLocaleString()}+ downloads`,
+                details: "DISTRESS: Stale Android app. Play Store distribution opportunity.",
+                status: "distressed",
+                user_count: downloadCount,
+                marketplace: "Google Play Store",
+                mrr_potential: Math.round(downloadCount * 0.005 * 2),
+              };
+            }).filter((a: any) => a.user_count >= 1000);
+          assets.push(...parsed);
+        })());
+      }
+
+      // 11. Microsoft Store / Edge Add-ons Scanner
+      if (scan_type === "microsoft" || scan_type === "all") {
+        scanPromises.push((async () => {
+          const results = await searchSerpApi(
+            `(site:apps.microsoft.com OR site:microsoftedge.microsoft.com/addons) "${target_url}" -"updated 2025" -"updated 2024"`
+          );
+          const parsed = results
+            .filter((item: any) => isValidMarketplaceUrl.microsoft(item.link || ""))
+            .map((item: any) => {
+              const userMatch = item.snippet?.match(/[\d,]+\s*(users?|downloads?|installs?)/i);
+              const userCount = userMatch ? parseInt(userMatch[0].replace(/\D/g, "")) : 500;
+              return {
+                id: item.link,
+                name: item.title?.replace(/ - Microsoft.*$/i, "").replace(/ -.*$/i, "") || "Unknown",
+                type: item.link.includes("microsoftedge") ? "edge_addon" : "microsoft_app",
+                url: item.link,
+                description: item.snippet?.substring(0, 150) || "No description",
+                revenue: `${userCount.toLocaleString()}+ users`,
+                details: "DISTRESS: Abandoned Microsoft ecosystem app. Windows/Edge opportunity.",
+                status: "distressed",
+                user_count: userCount,
+                marketplace: item.link.includes("microsoftedge") ? "Edge Add-ons" : "Microsoft Store",
+                mrr_potential: Math.round(userCount * 0.02 * 5),
+              };
+            }).filter((a: any) => a.user_count >= 500);
+          assets.push(...parsed);
+        })());
+      }
+
+      // 12. Salesforce AppExchange Scanner
+      if (scan_type === "salesforce" || scan_type === "all") {
+        scanPromises.push((async () => {
+          const results = await searchSerpApi(
+            `site:appexchange.salesforce.com "${target_url}" reviews -"new" -"updated 2025"`
+          );
+          const parsed = results
+            .filter((item: any) => isValidMarketplaceUrl.salesforce(item.link || ""))
+            .map((item: any) => {
+              const reviewMatch = item.snippet?.match(/[\d,]+\s*reviews?/i);
+              const reviewCount = reviewMatch ? parseInt(reviewMatch[0].replace(/\D/g, "")) : 10;
+              const estimatedUsers = reviewCount * 100; // Enterprise apps have fewer reviews per user
+              return {
+                id: item.link,
+                name: item.title?.replace(/ - Salesforce.*$/i, "").replace(/ \|.*$/i, "") || "Unknown",
+                type: "salesforce_app",
+                url: item.link,
+                description: item.snippet?.substring(0, 150) || "No description",
+                revenue: `~${estimatedUsers.toLocaleString()} installs`,
+                details: "DISTRESS: Salesforce app. Enterprise B2B gold - high LTV customers.",
+                status: "distressed",
+                user_count: estimatedUsers,
+                marketplace: "Salesforce AppExchange",
+                mrr_potential: Math.round(estimatedUsers * 0.05 * 50), // Enterprise pricing
+              };
+            }).filter((a: any) => a.user_count >= 500);
+          assets.push(...parsed);
+        })());
+      }
+
+      // 13. Atlassian Marketplace Scanner
+      if (scan_type === "atlassian" || scan_type === "all") {
+        scanPromises.push((async () => {
+          const results = await searchSerpApi(
+            `site:marketplace.atlassian.com/apps "${target_url}" installs -"updated 2025" -"updated 2024"`
+          );
+          const parsed = results
+            .filter((item: any) => isValidMarketplaceUrl.atlassian(item.link || ""))
+            .map((item: any) => {
+              const installMatch = item.snippet?.match(/[\d,]+\s*installs?/i);
+              const installCount = installMatch ? parseInt(installMatch[0].replace(/\D/g, "")) : 100;
+              return {
+                id: item.link,
+                name: item.title?.replace(/ \| Atlassian.*$/i, "").replace(/ -.*$/i, "") || "Unknown",
+                type: "atlassian_app",
+                url: item.link,
+                description: item.snippet?.substring(0, 150) || "No description",
+                revenue: `${installCount.toLocaleString()}+ installs`,
+                details: "DISTRESS: Jira/Confluence plugin. Enterprise dev team customers.",
+                status: "distressed",
+                user_count: installCount,
+                marketplace: "Atlassian Marketplace",
+                mrr_potential: Math.round(installCount * 0.03 * 20),
+              };
+            }).filter((a: any) => a.user_count >= 100);
+          assets.push(...parsed);
+        })());
+      }
+
+      // 14. Gumroad Scanner (Digital Products)
+      if (scan_type === "gumroad" || scan_type === "all") {
+        scanPromises.push((async () => {
+          const results = await searchSerpApi(
+            `site:gumroad.com "${target_url}" sales OR customers -"new" -"2025"`
+          );
+          const parsed = results
+            .filter((item: any) => isValidMarketplaceUrl.gumroad(item.link || ""))
+            .map((item: any) => {
+              const salesMatch = item.snippet?.match(/[\d,]+\s*sales?/i);
+              const salesCount = salesMatch ? parseInt(salesMatch[0].replace(/\D/g, "")) : 50;
+              return {
+                id: item.link,
+                name: item.title?.replace(/ - Gumroad.*$/i, "").replace(/ \|.*$/i, "") || "Unknown",
+                type: "gumroad_product",
+                url: item.link,
+                description: item.snippet?.substring(0, 150) || "No description",
+                revenue: `${salesCount.toLocaleString()}+ sales`,
+                details: "DISTRESS: Abandoned digital product. Existing customer base.",
+                status: "distressed",
+                user_count: salesCount,
+                marketplace: "Gumroad",
+                mrr_potential: Math.round(salesCount * 0.1 * 30), // Digital products often higher margin
+              };
+            }).filter((a: any) => a.user_count >= 50);
+          assets.push(...parsed);
+        })());
+      }
+
+      // Wait for all scans to complete
+      await Promise.all(scanPromises);
       
-      // Sort by user count (highest first)
-      assets.sort((a, b) => b.user_count - a.user_count);
-      
-      // Cache successful results
-      setCachedSerpResults(cacheKey, assets);
-      
-      return res.json({
-        assets,
-        isDemo: false,
-        dailyScans: dailyScans + 1,
-        scanLimit,
-        message: `Found ${assets.length} potential assets across marketplaces`
+      console.log(`[SerpAPI] Total assets found for "${target_url}": ${assets.length}`);
+
+      // Marketplace type to confidence key mapping
+      const typeToConfidenceKey: Record<string, string> = {
+        chrome_extension: "Chrome Web Store",
+        firefox_addon: "Firefox Add-ons",
+        shopify_app: "Shopify App Store",
+        wordpress_plugin: "WordPress.org",
+        slack_app: "Slack App Directory",
+        zapier_integration: "Zapier",
+        saas_product: "Product Hunt",
+        saas_forsale: "Flippa",
+        ios_app: "iOS App Store",
+        android_app: "Google Play Store",
+        edge_addon: "Microsoft Store",
+        microsoft_app: "Microsoft Store",
+        salesforce_app: "Salesforce AppExchange",
+        atlassian_app: "Atlassian Marketplace",
+        gumroad_product: "Gumroad",
+      };
+
+      // Enhance each asset with confidence data and valuation calculations
+      const enhancedAssets = assets.map((asset) => {
+        const confidenceKey = typeToConfidenceKey[asset.type] || "Product Hunt";
+        const confidence = MARKETPLACE_CONFIDENCE[confidenceKey] || { level: "low", reason: "Unknown marketplace" };
+        
+        // Calculate MRR range using formulas
+        const formula = MRR_FORMULAS[asset.type] || MRR_FORMULAS.saas_product;
+        const baseMrr = asset.mrr_potential || Math.round(asset.user_count * formula.conversionRate * formula.avgPrice);
+        const mrrRange = {
+          low: Math.round(baseMrr * 0.5),
+          mid: baseMrr,
+          high: Math.round(baseMrr * 2),
+        };
+
+        // Calculate valuation range (3-5x ARR)
+        const valuation = {
+          low: mrrRange.low * 12 * 3,
+          high: mrrRange.high * 12 * 5,
+          multiple: "3-5x ARR",
+        };
+
+        // Generate distress signals based on asset type
+        const distressSignals: string[] = [];
+        if (asset.type === "chrome_extension") {
+          distressSignals.push("Manifest V2 migration required");
+        }
+        if (asset.details?.includes("No updates")) {
+          distressSignals.push("No updates in 6+ months");
+        }
+        if (asset.status === "distressed") {
+          distressSignals.push("Shows distress indicators");
+        }
+
+        return {
+          ...asset,
+          confidence,
+          mrrRange,
+          valuation,
+          distressSignals,
+        };
       });
 
-    } catch (error: any) {
-      console.error("[Scan] Unexpected error:", error.message);
-      
-      // Final fallback on any error
-      const fallbackAssets = getFallbackAssets(target_url);
-      return res.json({
-        assets: fallbackAssets,
-        isDemo: true,
-        error: "Scan encountered an issue. Showing curated results.",
-        dailyScans: dailyScans + 1,
+      // Sort by MRR potential (highest first)
+      enhancedAssets.sort((a, b) => (b.mrr_potential || 0) - (a.mrr_potential || 0));
+
+      // If no assets found in live scan, fall back to seeded assets for better demo experience
+      if (enhancedAssets.length === 0) {
+        console.log(`[SerpAPI] No live assets found for "${target_url}", falling back to demo assets`);
+        const demoAssets = getSeededAssets(target_url);
+        return res.json({
+          assets: demoAssets,
+          isDemo: true,
+          total_found: demoAssets.length,
+          marketplaces_scanned: 14,
+          dailyScans,
+          scanLimit,
+          message: `Showing demo results for "${target_url}" (no live assets found in initial scan)`
+        });
+      }
+
+      // Final response for live assets
+      setCachedSerpResults(cacheKey, enhancedAssets);
+      res.json({
+        assets: enhancedAssets,
+        total_found: enhancedAssets.length,
+        marketplaces_scanned: scan_type === "all" ? 14 : 1,
+        dailyScans,
         scanLimit
       });
+    } catch (error: any) {
+      console.error("Scan Error:", error.message);
+      res.status(500).json({ error: "Scan failed", details: error.message });
     }
   });
-  
-  // Helper: Search via SerpAPI and parse results
-  async function searchSerpApiForAssets(query: string, apiKey: string): Promise<ScrapedAsset[]> {
-    const assets: ScrapedAsset[] = [];
-    
-    const searchQueries = [
-      `site:chromewebstore.google.com/detail "${query}" users`,
-      `site:apps.shopify.com "${query}" reviews`,
-      `site:wordpress.org/plugins "${query}" active installations`,
-    ];
-    
-    for (const searchQuery of searchQueries) {
-      try {
-        const result = await axios.get("https://serpapi.com/search.json", {
-          params: { engine: "google", q: searchQuery, api_key: apiKey, num: 10 },
-          timeout: 10000,
-        });
-        
-        const organicResults = result.data.organic_results || [];
-        for (const item of organicResults) {
-          const url = item.link || "";
-          const title = item.title || "Unknown";
-          const snippet = item.snippet || "";
-          
-          // Parse user counts from snippets
-          const userMatch = snippet.match(/[\d,]+\s*(users?|install|download|review)/i);
-          const userCount = userMatch ? parseInt(userMatch[0].replace(/\D/g, "")) : 5000;
-          
-          let marketplace = "Unknown";
-          let type = "digital_asset";
-          
-          if (url.includes("chromewebstore")) {
-            marketplace = "Chrome Web Store";
-            type = "chrome_extension";
-          } else if (url.includes("apps.shopify")) {
-            marketplace = "Shopify App Store";
-            type = "shopify_app";
-          } else if (url.includes("wordpress.org/plugins")) {
-            marketplace = "WordPress.org";
-            type = "wordpress_plugin";
-          }
-          
-          if (userCount >= 1000) {
-            assets.push({
-              id: `serp-${Buffer.from(url).toString('base64').substring(0, 16)}`,
-              name: title.replace(/( - Chrome Web Store| \| Shopify| – WordPress.*)/gi, ""),
-              type,
-              url,
-              description: snippet.substring(0, 150),
-              revenue: `${userCount.toLocaleString()} users`,
-              details: "Found via search. Verify distress signals manually.",
-              status: "potential",
-              user_count: userCount,
-              marketplace,
-              mrr_potential: Math.round(userCount * 0.1),
-            });
-          }
-        }
-      } catch (e: any) {
-        console.error(`[SerpAPI] Query failed:`, e.message);
-      }
-    }
-    
-    return assets;
-  }
-
 
   // Helper: Get PageSpeed Insights score (free API - no key required, rate limited)
   async function getPageSpeedScore(url: string): Promise<{ score: number; metrics: any } | null> {
@@ -888,21 +1382,9 @@ export async function registerRoutes(
     return result;
   }
 
-  // Hardcoded test emails that always get premium access (for development/testing)
-  const TEST_PREMIUM_EMAILS = [
-    "esteadam@gmail.com",
-    "palmtreedreamsinc@gmail.com"
-  ];
-
   // Helper function to check if user is premium (has active subscription)
   async function isUserPremium(email?: string): Promise<boolean> {
     if (!email) return false;
-    
-    // Grant premium to test emails
-    if (TEST_PREMIUM_EMAILS.includes(email.toLowerCase())) {
-      return true;
-    }
-    
     try {
       const user = await storage.getUserByEmail(email);
       if (!user || !user.stripeSubscriptionId) return false;
@@ -1947,19 +2429,9 @@ Best,
     }
   });
   
-  // Get current session status - supports both Replit OIDC and magic link auth
+  // Get current session status
   app.get("/api/session/status", async (req, res) => {
-    // Check for Replit OIDC auth (req.user from passport)
-    const user = req.user as any;
-    const oidcEmail = user?.claims?.email;
-    
-    // Check for magic link auth (req.session.email)
-    const sessionEmail = req.session.email;
-    
-    // Use whichever auth method is available
-    const email = oidcEmail || sessionEmail;
-    
-    if (!email) {
+    if (!req.session.email) {
       return res.json({ 
         authenticated: false,
         isPremium: false 
@@ -1967,25 +2439,18 @@ Best,
     }
     
     // Re-check premium status (in case subscription changed)
-    const isPremium = await isUserPremium(email);
-    const referrals = await storage.getReferralsByReferredEmail(email);
+    const isPremium = await isUserPremium(req.session.email);
+    const referrals = await storage.getReferralsByReferredEmail(req.session.email);
     const hasActiveTrial = referrals.some(r => 
       r.status === "redeemed" && r.trialEndsAt && new Date(r.trialEndsAt) > new Date()
     );
     
-    const premiumStatus = isPremium || hasActiveTrial;
-    
-    // Sync session for consistency
-    if (oidcEmail && !sessionEmail) {
-      req.session.email = oidcEmail;
-    }
-    req.session.isPremium = premiumStatus;
+    req.session.isPremium = isPremium || hasActiveTrial;
     
     res.json({
       authenticated: true,
-      email: email,
-      isPremium: premiumStatus,
-      authMethod: oidcEmail ? 'oidc' : 'magic_link',
+      email: req.session.email,
+      isPremium: req.session.isPremium,
       claimedAt: req.session.claimedAt
     });
   });
@@ -2237,6 +2702,245 @@ Best,
     });
     
     res.json({ success: true });
+  });
+
+  // === PYTHON ENGINE ENDPOINTS ===
+  // Health check for Python Revenue Engine
+  app.get("/api/engine/health", async (req, res) => {
+    try {
+      const health = await pythonEngine.checkHealth();
+      if (health) {
+        res.json({
+          status: "connected",
+          engine: health,
+          message: "Python Revenue Engine is operational"
+        });
+      } else {
+        res.json({
+          status: "disconnected",
+          message: "Python Engine not available - using Node.js fallback"
+        });
+      }
+    } catch (error: any) {
+      res.json({
+        status: "error",
+        message: error.message
+      });
+    }
+  });
+
+  // Scan using Python Engine (with fallback to existing Node.js scan)
+  app.post("/api/engine/scan", async (req, res) => {
+    const { query, marketplaces, min_users = 1000, max_results = 20 } = req.body;
+    
+    try {
+      // Try Python engine first
+      const result = await pythonEngine.scan(
+        query || "",
+        marketplaces,
+        min_users,
+        max_results
+      );
+      
+      if (result && result.assets.length > 0) {
+        // Transform assets to match frontend format
+        const transformedAssets = result.assets.map(asset => ({
+          id: asset.id,
+          name: asset.name,
+          type: `${asset.marketplace}_asset`,
+          url: asset.url,
+          description: asset.description || "",
+          revenue: `${asset.users.toLocaleString()} users`,
+          details: asset.verification_notes || `Distress Score: ${asset.distress_score}/10`,
+          status: asset.distress_score >= 5 ? "distressed" : "healthy",
+          user_count: asset.users,
+          marketplace: asset.marketplace,
+          mrr_potential: asset.estimated_mrr || 0,
+          valuation: asset.estimated_valuation || 0,
+          distress_score: asset.distress_score,
+          distress_signals: asset.distress_signals,
+          verified: asset.verified,
+        }));
+        
+        return res.json({
+          assets: transformedAssets,
+          total_found: result.total_found,
+          marketplaces_scanned: result.marketplaces_scanned,
+          scan_duration_ms: result.scan_duration_ms,
+          source: "python_engine",
+          cached: result.cached,
+        });
+      }
+      
+      // Fallback to seeded assets if Python engine fails
+      const fallbackAssets = getSeededAssets(query || "");
+      res.json({
+        assets: fallbackAssets,
+        total_found: fallbackAssets.length,
+        marketplaces_scanned: 14,
+        scan_duration_ms: 0,
+        source: "fallback",
+        message: "Using cached demo results"
+      });
+    } catch (error: any) {
+      console.error("[Engine Scan] Error:", error.message);
+      const fallbackAssets = getSeededAssets(query || "");
+      res.json({
+        assets: fallbackAssets,
+        total_found: fallbackAssets.length,
+        source: "fallback",
+        error: error.message
+      });
+    }
+  });
+
+  // Verify asset using Python Engine
+  app.post("/api/engine/verify", async (req, res) => {
+    const { asset_id, asset_url, marketplace } = req.body;
+    
+    if (!asset_url || !marketplace) {
+      return res.status(400).json({ error: "asset_url and marketplace required" });
+    }
+    
+    try {
+      const result = await pythonEngine.verify(
+        asset_id || "unknown",
+        asset_url,
+        marketplace
+      );
+      
+      if (result) {
+        res.json({
+          success: true,
+          verification: result
+        });
+      } else {
+        res.status(503).json({
+          success: false,
+          message: "Verification service unavailable"
+        });
+      }
+    } catch (error: any) {
+      console.error("[Engine Verify] Error:", error.message);
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  // List available marketplaces
+  app.get("/api/marketplaces", async (req, res) => {
+    const marketplaces = await pythonEngine.getMarketplaces();
+    res.json({
+      marketplaces,
+      total: marketplaces.length
+    });
+  });
+
+  // === SAVED ASSETS (WATCHLIST) API ===
+  // Get user's saved assets - requires authentication
+  app.get("/api/saved", async (req, res) => {
+    if (!req.isAuthenticated || !req.isAuthenticated()) {
+      return res.status(401).json({ error: "Authentication required", authenticated: false });
+    }
+    
+    const userId = req.session?.email || (req.user as any)?.email;
+    if (!userId || typeof userId !== 'string') {
+      return res.status(401).json({ error: "Invalid user session" });
+    }
+    
+    try {
+      const savedAssets = await storage.getSavedAssets(userId);
+      res.json({
+        assets: savedAssets,
+        total: savedAssets.length
+      });
+    } catch (error: any) {
+      console.error("[Saved] Get error:", error.message);
+      res.status(500).json({ error: "Failed to get saved assets" });
+    }
+  });
+
+  // Save an asset - requires authentication
+  app.post("/api/saved", async (req, res) => {
+    if (!req.isAuthenticated || !req.isAuthenticated()) {
+      return res.status(401).json({ error: "Authentication required", authenticated: false });
+    }
+    
+    const userId = req.session?.email || (req.user as any)?.email;
+    if (!userId || typeof userId !== 'string') {
+      return res.status(401).json({ error: "Invalid user session" });
+    }
+    
+    const { assetId, assetName, assetUrl, marketplace, description, users, estimatedMrr, distressScore, assetData } = req.body;
+    
+    if (!assetId || !assetName || !assetUrl || !marketplace) {
+      return res.status(400).json({ error: "assetId, assetName, assetUrl, and marketplace are required" });
+    }
+    
+    try {
+      const saved = await storage.saveAsset({
+        userId,
+        assetId,
+        assetName,
+        assetUrl,
+        marketplace,
+        description: description || null,
+        users: users || 0,
+        estimatedMrr: estimatedMrr || 0,
+        distressScore: distressScore || 0,
+        assetData: assetData || null,
+      });
+      
+      res.json({
+        success: true,
+        asset: saved
+      });
+    } catch (error: any) {
+      console.error("[Saved] Save error:", error.message);
+      res.status(500).json({ error: "Failed to save asset" });
+    }
+  });
+
+  // Unsave an asset - requires authentication
+  app.delete("/api/saved/:assetId", async (req, res) => {
+    if (!req.isAuthenticated || !req.isAuthenticated()) {
+      return res.status(401).json({ error: "Authentication required", authenticated: false });
+    }
+    
+    const userId = req.session?.email || (req.user as any)?.email;
+    const { assetId } = req.params;
+    
+    if (!userId || typeof userId !== 'string') {
+      return res.status(401).json({ error: "Invalid user session" });
+    }
+    
+    try {
+      await storage.unsaveAsset(userId, assetId);
+      res.json({ success: true });
+    } catch (error: any) {
+      console.error("[Saved] Unsave error:", error.message);
+      res.status(500).json({ error: "Failed to unsave asset" });
+    }
+  });
+
+  // Check if asset is saved
+  app.get("/api/saved/:assetId/check", async (req, res) => {
+    if (!req.isAuthenticated || !req.isAuthenticated()) {
+      return res.json({ saved: false, authenticated: false });
+    }
+    
+    const userId = req.session?.email || (req.user as any)?.email;
+    const { assetId } = req.params;
+    
+    if (!userId || typeof userId !== 'string') {
+      return res.json({ saved: false });
+    }
+    
+    try {
+      const isSaved = await storage.isAssetSaved(userId, assetId);
+      res.json({ saved: isSaved });
+    } catch (error: any) {
+      res.json({ saved: false });
+    }
   });
 
   return httpServer;

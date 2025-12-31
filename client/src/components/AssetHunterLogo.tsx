@@ -21,45 +21,36 @@ export function AssetHunterLogo({ className, size = "md" }: LogoIconProps) {
         className="w-full h-full"
         aria-hidden="true"
       >
-        {/* Brand Navy Background with subtle border */}
-        <rect 
-          width="32" 
-          height="32" 
-          rx="7" 
-          fill="#0F1729"
-        />
-        <rect 
-          x="0.5" 
-          y="0.5" 
-          width="31" 
-          height="31" 
-          rx="6.5" 
-          stroke="white"
-          strokeOpacity="0.12"
-          strokeWidth="1"
-          fill="none"
-        />
+        {/* Resend-style geometric monogram 'A' */}
+        {/* We use the same aesthetic: thick, purposeful strokes and sharp geometric cuts */}
+        
+        {/* Background 'container' shape like the Resend screenshot */}
+        <rect width="32" height="32" rx="8" className="fill-slate-950" />
+        <rect width="32" height="32" rx="8" className="stroke-white/10" strokeWidth="1" />
 
-        {/* Clean geometric 'A' - bold white strokes */}
+        {/* The 'A' glyph inspired by the Resend 'R' geometry */}
         <path
-          d="M16 8L24 24"
+          d="M9 23L16 9L23 23"
           stroke="white"
           strokeWidth="3.5"
-          strokeLinecap="round"
-        />
-        <path
-          d="M16 8L8 24"
-          stroke="white"
-          strokeWidth="3.5"
-          strokeLinecap="round"
+          strokeLinecap="butt"
+          strokeLinejoin="miter"
         />
         
-        {/* Solid indigo crossbar - the brand accent */}
+        {/* The horizontal bar - matching the brand style with emerald */}
         <path
-          d="M11 19H21"
-          stroke="#4F46E5"
+          d="M12.5 18H19.5"
+          stroke="hsl(var(--accent))"
           strokeWidth="3.5"
-          strokeLinecap="round"
+          strokeLinecap="butt"
+        />
+        
+        {/* Precise geometric cut - the 'A' crossbar highlight */}
+        <path
+          d="M15 18H17"
+          stroke="white"
+          strokeWidth="3.5"
+          strokeLinecap="butt"
         />
       </svg>
     </div>

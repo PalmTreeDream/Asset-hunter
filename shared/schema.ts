@@ -164,3 +164,24 @@ export const contactSubmissions = pgTable("contact_submissions", {
 export const insertContactSubmissionSchema = createInsertSchema(contactSubmissions).omit({ id: true, createdAt: true, status: true });
 export type ContactSubmission = typeof contactSubmissions.$inferSelect;
 export type InsertContactSubmission = z.infer<typeof insertContactSubmissionSchema>;
+
+// === SAVED ASSETS (Watchlist) ===
+export const savedAssets = pgTable("saved_assets", {
+  id: serial("id").primaryKey(),
+  userId: text("user_id").notNull(), // Replit user ID or email
+  assetId: text("asset_id").notNull(), // Unique asset identifier
+  assetName: text("asset_name").notNull(),
+  assetUrl: text("asset_url").notNull(),
+  marketplace: text("marketplace").notNull(),
+  description: text("description"),
+  users: integer("users").default(0),
+  estimatedMrr: integer("estimated_mrr").default(0),
+  distressScore: integer("distress_score").default(0),
+  assetData: jsonb("asset_data"), // Full asset JSON for reference
+  notes: text("notes"), // User's personal notes
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const insertSavedAssetSchema = createInsertSchema(savedAssets).omit({ id: true, createdAt: true });
+export type SavedAsset = typeof savedAssets.$inferSelect;
+export type InsertSavedAsset = z.infer<typeof insertSavedAssetSchema>;

@@ -28,7 +28,7 @@ export default function Terms() {
       <main className="pt-24 pb-16 px-4 sm:px-6 lg:px-8">
         <div className="max-w-4xl mx-auto">
           <h1 className="text-3xl font-bold mb-2" data-testid="text-page-title">Terms of Service</h1>
-          <p className="text-muted-foreground mb-8">Last updated: December 28, 2025</p>
+          <p className="text-muted-foreground mb-8">Last updated: December 25, 2024</p>
 
           <div className="prose prose-gray dark:prose-invert max-w-none space-y-8">
             <section>

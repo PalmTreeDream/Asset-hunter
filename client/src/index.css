@@ -1,155 +1,152 @@
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap');
-@import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@300;400;500;600;700&display=swap');
 
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
 :root {
-  /* Acquire.com-Inspired Clean Theme */
-  --font-sans: 'Inter', ui-sans-serif, system-ui, sans-serif, "Apple Color Emoji", "Segoe UI Emoji";
-  --font-display: 'Inter', ui-sans-serif, system-ui, sans-serif;
-  --font-mono: 'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, Monaco, monospace;
+  /* Stripe/Linear-Inspired Light Glassmorphism Theme */
+  --font-sans: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  --font-display: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  --font-mono: 'SF Mono', 'JetBrains Mono', 'Fira Code', monospace;
 
-  /* Clean white base - Acquire.com style */
+  /* LIGHT & AIRY - Clean white base */
   --background: 0 0% 100%;
-  --foreground: 240 6% 10%;
+  --foreground: 222 47% 11%;
   
-  /* Primary - Indigo-600 (#4F46E5) - main accent color */
-  --primary: 239 84% 67%;
+  /* Primary - Deep indigo/purple (Stripe-inspired) */
+  --primary: 243 75% 59%;
   --primary-foreground: 0 0% 100%;
   
-  /* Secondary - Soft gray */
-  --secondary: 250 10% 95%;
-  --secondary-foreground: 248 88% 5%;
+  /* Secondary - Soft cool gray */
+  --secondary: 220 14% 96%;
+  --secondary-foreground: 222 47% 20%;
   
-  /* Muted - Acquire's exact muted colors */
-  --muted: 240 6% 93%;
-  --muted-foreground: 240 5% 45%;
+  /* Muted - Subtle backgrounds */
+  --muted: 220 14% 96%;
+  --muted-foreground: 220 10% 46%;
   
-  /* Accent - Clean gray accent */
-  --accent: 220 8% 92%;
-  --accent-foreground: 248 88% 5%;
+  /* Accent - Vibrant emerald/teal */
+  --accent: 160 84% 39%;
+  --accent-foreground: 0 0% 100%;
   
   /* Destructive */
-  --destructive: 350 84% 46%;
+  --destructive: 0 72% 51%;
   --destructive-foreground: 0 0% 100%;
 
-  /* Cards - Clean white */
+  /* Cards - White with soft borders */
   --card: 0 0% 100%;
-  --card-foreground: 240 6% 10%;
+  --card-foreground: 222 47% 11%;
   
   /* Popover */
   --popover: 0 0% 100%;
-  --popover-foreground: 240 6% 10%;
-  --popover-border: 220 8% 90%;
+  --popover-foreground: 222 47% 11%;
+  --popover-border: 220 14% 90%;
 
-  /* Borders - Subtle like Acquire (rgba(0,0,0,0.1)) */
-  --border: 220 8% 90%;
-  --input: 0 0% 100%;
-  --input-background: 240 4% 96%;
-  --ring: 239 84% 67%;
+  /* Borders - Very subtle */
+  --border: 220 14% 91%;
+  --input: 220 14% 91%;
+  --ring: 243 75% 59%;
   
   /* Border variants */
-  --card-border: 220 8% 90%;
-  --primary-border: 239 84% 60%;
-  --secondary-border: 220 8% 88%;
-  --muted-border: 220 8% 88%;
-  --accent-border: 220 8% 85%;
-  --destructive-border: 350 84% 40%;
-  --sidebar-primary-border: 239 84% 60%;
-  --sidebar-accent-border: 220 8% 88%;
+  --card-border: 220 14% 91%;
+  --primary-border: 243 75% 55%;
+  --secondary-border: 220 14% 88%;
+  --muted-border: 220 14% 88%;
+  --accent-border: 160 84% 35%;
+  --destructive-border: 0 72% 46%;
+  --sidebar-primary-border: 243 75% 55%;
+  --sidebar-accent-border: 220 14% 88%;
   
-  /* Acquire's radius: 0.625rem (10px) */
-  --radius: 0.625rem;
+  /* SOFT ROUNDED CORNERS */
+  --radius: 20px;
   
-  /* Panels */
+  /* GLASS PANELS - Translucent with blur */
   --panel: 0 0% 100%;
-  --panel-foreground: 240 6% 10%;
-  --panel-border: 220 8% 90%;
+  --panel-foreground: 222 47% 11%;
+  --panel-border: 220 14% 90%;
   
-  /* DATA VISUALIZATION */
-  --viz-blue: 239 84% 67%;
+  /* DATA VISUALIZATION - Vibrant palette */
+  --viz-blue: 221 83% 53%;
   --viz-green: 160 84% 39%;
   --viz-amber: 38 92% 50%;
   --viz-red: 0 72% 51%;
   --viz-gray: 220 10% 55%;
   --viz-panel: 0 0% 100%;
-  --viz-grid: 220 8% 92%;
+  --viz-grid: 220 14% 92%;
   
-  /* Sidebar */
-  --sidebar: 0 0% 97%;
-  --sidebar-foreground: 240 6% 10%;
-  --sidebar-primary: 239 84% 67%;
+  /* Sidebar - Light glassmorphic */
+  --sidebar: 0 0% 100%;
+  --sidebar-foreground: 222 47% 20%;
+  --sidebar-primary: 243 75% 59%;
   --sidebar-primary-foreground: 0 0% 100%;
-  --sidebar-accent: 0 0% 95%;
-  --sidebar-accent-foreground: 240 5% 26%;
-  --sidebar-border: 0 0% 91%;
-  --sidebar-ring: 239 84% 67%;
+  --sidebar-accent: 220 14% 96%;
+  --sidebar-accent-foreground: 222 47% 20%;
+  --sidebar-border: 220 14% 91%;
+  --sidebar-ring: 243 75% 59%;
   
-  /* Charts - Acquire palette */
-  --chart-1: 38 92% 50%;
-  --chart-2: 173 58% 39%;
-  --chart-3: 220 8% 46%;
-  --chart-4: 43 74% 66%;
-  --chart-5: 27 87% 67%;
+  /* Charts */
+  --chart-1: 160 84% 39%;
+  --chart-2: 221 83% 53%;
+  --chart-3: 38 92% 50%;
+  --chart-4: 0 72% 51%;
+  --chart-5: 270 70% 60%;
   
-  /* Gradient colors */
-  --gradient-start: 239 84% 67%;
-  --gradient-mid: 250 70% 55%;
-  --gradient-end: 280 70% 55%;
+  /* Gradient colors for hero */
+  --gradient-start: 243 75% 59%;
+  --gradient-mid: 280 70% 55%;
+  --gradient-end: 330 80% 60%;
   
   /* Rainbow Button Colors */
-  --color-1: 239 84% 67%;
-  --color-2: 250 70% 55%;
+  --color-1: 160 84% 39%;
+  --color-2: 243 75% 59%;
   --color-3: 280 70% 55%;
   --color-4: 38 92% 50%;
   --color-5: 330 80% 60%;
 }
 
 .dark {
-  /* Deep Indigo Terminal Theme - #120B29 base */
-  --background: 260 60% 10%;
+  --background: 222 47% 6%;
   --foreground: 210 20% 98%;
   
-  --primary: 239 84% 67%;
-  --primary-foreground: 0 0% 100%;
+  --primary: 243 75% 65%;
+  --primary-foreground: 222 47% 6%;
   
-  --secondary: 260 45% 16%;
+  --secondary: 222 40% 14%;
   --secondary-foreground: 210 20% 90%;
   
-  --muted: 260 45% 14%;
-  --muted-foreground: 220 12% 62%;
+  --muted: 222 40% 12%;
+  --muted-foreground: 220 12% 58%;
   
-  --accent: 239 84% 67%;
-  --accent-foreground: 0 0% 100%;
+  --accent: 160 84% 45%;
+  --accent-foreground: 222 47% 6%;
   
   --destructive: 0 65% 52%;
   --destructive-foreground: 0 0% 100%;
 
-  --card: 260 50% 12%;
-  --card-foreground: 210 20% 94%;
+  --card: 222 40% 10%;
+  --card-foreground: 210 20% 92%;
   
-  --popover: 260 50% 12%;
-  --popover-foreground: 210 20% 94%;
-  --popover-border: 260 45% 22%;
+  --popover: 222 40% 10%;
+  --popover-foreground: 210 20% 92%;
+  --popover-border: 222 40% 18%;
 
-  --border: 260 45% 20%;
-  --input: 260 45% 20%;
-  --ring: 239 84% 67%;
+  --border: 222 40% 16%;
+  --input: 222 40% 16%;
+  --ring: 243 75% 65%;
   
-  --card-border: 260 45% 24%;
-  --primary-border: 239 84% 60%;
-  --secondary-border: 260 45% 22%;
-  --muted-border: 260 45% 22%;
-  --accent-border: 239 84% 60%;
+  --card-border: 222 40% 20%;
+  --primary-border: 243 75% 60%;
+  --secondary-border: 222 40% 20%;
+  --muted-border: 222 40% 20%;
+  --accent-border: 160 84% 38%;
   --destructive-border: 0 65% 48%;
-  --sidebar-primary-border: 239 84% 60%;
-  --sidebar-accent-border: 260 45% 22%;
+  --sidebar-primary-border: 243 75% 60%;
+  --sidebar-accent-border: 222 40% 20%;
   
-  --panel: 260 50% 12%;
-  --panel-foreground: 210 20% 94%;
-  --panel-border: 260 45% 22%;
+  --panel: 222 40% 10%;
+  --panel-foreground: 210 20% 92%;
+  --panel-border: 222 40% 18%;
   
   --viz-blue: 221 83% 60%;
   --viz-green: 160 84% 48%;
@@ -157,8 +154,8 @@
   --viz-red: 0 72% 55%;
   --viz-gray: 220 12% 60%;
   
-  --sidebar: 260 55% 8%;
-  --sidebar-foreground: 210 20% 94%;
+  --sidebar: 222 40% 8%;
+  --sidebar-foreground: 210 20% 92%;
 }
 
 @layer base {
@@ -204,33 +201,18 @@
   }
   
   .dark .glass {
-    background: rgba(18, 11, 41, 0.75);
-    border: 0.5px solid rgba(160, 180, 255, 0.12);
+    background: rgba(15, 23, 42, 0.7);
+    border: 1px solid rgba(255, 255, 255, 0.1);
   }
   
   .dark .glass-strong {
-    background: rgba(18, 11, 41, 0.88);
-    border: 0.5px solid rgba(160, 180, 255, 0.18);
+    background: rgba(15, 23, 42, 0.85);
+    border: 1px solid rgba(255, 255, 255, 0.15);
   }
   
   .dark .glass-subtle {
-    background: rgba(18, 11, 41, 0.55);
-    border: 0.5px solid rgba(160, 180, 255, 0.08);
-  }
-  
-  /* Terminal-specific glassmorphism - 0.5px borders */
-  .glass-terminal {
-    background: rgba(18, 11, 41, 0.65);
-    backdrop-filter: blur(20px);
-    -webkit-backdrop-filter: blur(20px);
-    border: 0.5px solid rgba(160, 180, 255, 0.15);
-  }
-  
-  .glass-card {
-    background: rgba(30, 20, 60, 0.5);
-    backdrop-filter: blur(16px);
-    -webkit-backdrop-filter: blur(16px);
-    border: 0.5px solid rgba(160, 180, 255, 0.12);
+    background: rgba(15, 23, 42, 0.5);
+    border: 1px solid rgba(255, 255, 255, 0.08);
   }
 
   /* GRADIENT BACKGROUNDS - Stripe-inspired */
@@ -268,8 +250,8 @@
   .gradient-accent {
     background: linear-gradient(
       135deg,
-      hsl(var(--primary)) 0%,
-      hsl(250, 70%, 55%) 100%
+      hsl(var(--accent)) 0%,
+      hsl(160, 84%, 45%) 100%
     );
   }
 
@@ -300,7 +282,7 @@
   
   .shadow-glow-accent {
     box-shadow: 
-      0 0 40px rgba(79, 70, 229, 0.2),
+      0 0 40px rgba(16, 183, 127, 0.2),
       0 8px 32px rgba(0, 0, 0, 0.06);
   }
 

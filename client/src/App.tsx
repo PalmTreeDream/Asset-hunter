@@ -1,4 +1,4 @@
-import { Switch, Route, useLocation } from "wouter";
+import { Switch, Route, useLocation, Redirect } from "wouter";
 import { queryClient, apiRequest } from "./lib/queryClient";
 import { QueryClientProvider, useMutation } from "@tanstack/react-query";
 import { Toaster } from "@/components/ui/toaster";
@@ -15,6 +15,7 @@ import Landing from "@/pages/Landing";
 import Dashboard from "@/pages/Dashboard";
 import Hunt from "@/pages/Hunt";
 import Feed from "@/pages/Feed";
+import Watchlist from "@/pages/Watchlist";
 import LeadDetail from "@/pages/LeadDetail";
 import Settings from "@/pages/Settings";
 import Pulse from "@/pages/Pulse";
@@ -28,13 +29,13 @@ import NotFound from "@/pages/not-found";
 function AppRouter() {
   return (
     <Switch>
-      <Route path="/app" component={Hunt} />
       <Route path="/hunt" component={Hunt} />
-      <Route path="/watchlist" component={Dashboard} />
+      <Route path="/watchlist" component={Watchlist} />
       <Route path="/leads/:id" component={LeadDetail} />
       <Route path="/settings" component={Settings} />
       <Route path="/pulse" component={Pulse} />
       <Route path="/pricing" component={Pricing} />
+      {/* Demo removed for MVP */}
       <Route path="/contact" component={Contact} />
       <Route path="/terms" component={Terms} />
       <Route path="/privacy" component={Privacy} />
@@ -44,15 +45,11 @@ function AppRouter() {
 }
 
 function Layout({ children }: { children: React.ReactNode }) {
-  useEffect(() => {
-    document.documentElement.classList.add('dark');
-  }, []);
-  
   return (
-    <div className="min-h-screen bg-background font-sans text-foreground flex dark">
+    <div className="min-h-screen bg-background font-sans text-foreground flex">
       <Navigation />
       <main className="flex-1 lg:pl-64 pl-0 transition-all duration-300 w-full overflow-x-hidden">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 lg:py-8 pt-16 lg:pt-8">
+        <div className="container max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 lg:py-12 pt-16 lg:pt-12">
           {children}
         </div>
       </main>
@@ -186,7 +183,7 @@ function App() {
   const [location] = useLocation();
   
   // Marketing pages that bypass the app layout (have their own headers)
-  const marketingPages = ["/", "/login", "/pricing", "/contact", "/terms", "/privacy", "/feed"];
+  const marketingPages = ["/", "/login", "/pricing", "/contact", "/terms", "/privacy", "/feed", "/app"];
   const isMarketingPage = marketingPages.includes(location);
   
   return (
@@ -201,6 +198,7 @@ function App() {
             <Route path="/terms" component={Terms} />
             <Route path="/privacy" component={Privacy} />
             <Route path="/feed" component={Feed} />
+            <Route path="/app">{() => <Redirect to="/feed" />}</Route>
           </Switch>
         ) : (
           <Layout>

@@ -7,38 +7,7 @@ Key capabilities include:
 - **Distress Scanner**: Scours app stores for abandoned apps with large user bases.
 - **Hunter Intelligence (AHI)**: Proprietary AI for calculating MRR potential and generating acquisition playbooks.
 - **Lead Management**: Tools to track, analyze, and manage acquisition targets.
-- **Bloomberg-style Terminal**: Real-time streaming of opportunities with valuations at /feed route.
-
-## Recent Changes (December 31, 2025)
-- **Acquire.com-Inspired Redesign (Indigo Accent)** - Clean, professional marketplace design pattern
-  - Landing page: Hero with value proposition, trust metrics bar (4.8 rating, $2.4M+ discovered, 1,200+ hunters), How It Works section, Features grid, Testimonials, Pricing preview
-  - Feed/Browse page: Light theme marketplace preview with asset cards, search, and filters
-  - Design pattern: White backgrounds for marketing pages, indigo-600 (#4F46E5) accents, professional typography
-  - Card hover states: hover:shadow-xl hover:border-indigo-200 (clean flat design, no glassmorphism)
-  - Category badges: bg-indigo-50 text-indigo-700
-  - Dual-theme approach: Light theme for marketing (/, /feed), dark terminal for app (/hunt, /pricing)
-  - Updated design_guidelines.md with exact Acquire.com patterns
-
-- **Hunt Page Terminal** - Maintains dark terminal aesthetics for app interior
-  - Auto-load on page entry: triggers "productivity" scan automatically
-  - Terminal glassmorphism: glass-terminal and glass-card utility classes
-  - JetBrains Mono (font-mono) for metrics and data displays
-  - Blur overlay on asset cards 4+ for non-premium users
-
-## Previous Changes (December 28, 2025)
-- **Direct Web Scraping System** - Eliminated dependency on SerpAPI credits
-  - Created `server/direct-scrapers.ts` with dedicated scrapers for all 14 marketplaces
-  - Three-tier scanning strategy: Direct Scraping (free) → SerpAPI backup → Curated fallback
-  - 6-hour caching prevents repeated scraping of same queries
-- Restored full site architecture with dedicated pages: /hunt (distress scanner), /login (magic link auth), /pulse (analytics)
-- Feed page now shows curated preview assets with search bar linking to Hunt page
-- Restored 3-tier Pricing: Scout ($29/mo sold out), Hunter ($99/mo sold out), Founding Member ($149 lifetime active)
-- Hunt.tsx reads ?q= query parameter to pre-populate search from Feed page
-- Fixed authentication: session status now recognizes both Replit OIDC (Google/GitHub login) AND magic link auth
-- Authenticated users now get REAL live scans (not demo); contact info remains Pro-only
-- Added "Signed In" badge and "Upgrade to Pro" link for authenticated non-Pro users
-- Fixed Stripe checkout to use proper POST mutation with loading states
-- Updated Terms/Privacy dates to December 28, 2025
+- **Bloomberg-style Dashboard**: Real-time streaming of opportunities with valuations.
 
 ## User Preferences
 Preferred communication style: Simple, everyday language.
@@ -52,11 +21,7 @@ Preferred communication style: Simple, everyday language.
 - **State Management**: TanStack React Query
 - **Animations**: Framer Motion, with Apple-quality easing (cubic-bezier 0.22, 1, 0.36, 1) and scroll reveal effects.
 - **Build Tool**: Vite
-- **Design System**: Dual-theme approach inspired by Acquire.com
-  - Marketing pages (/, /feed): Clean white backgrounds, professional typography (Inter), indigo-600 (#4F46E5) accents
-  - App pages (/hunt, /pricing): Dark terminal theme with slate-950 backgrounds
-  - Consistent indigo-600 (#4F46E5) as primary accent color throughout
-  - 10px border radius, border-slate-200 borders, hover:shadow-xl patterns
+- **Design System**: Jony Ive-inspired with DM Sans/Outfit/SF Mono typography, 16-24px border radius, and a color palette of Primary Navy (#0F1729) and Accent Emerald (#10B77F). Layout features a clean light canvas with floating dark panels and pill-shaped buttons.
 
 ### Backend
 - **Framework**: Express.js with TypeScript
@@ -92,11 +57,7 @@ Preferred communication style: Simple, everyday language.
 
 ### Payments
 - **Provider**: Stripe via `stripe-replit-sync`.
-- **Pricing**: Three-tier structure:
-  - Scout ($29/mo): 30 scans/month, 5 owner reveals - SOLD OUT
-  - Hunter ($99/mo): Unlimited scans + reveals, acquisition playbooks - SOLD OUT
-  - Founding Member ($149 lifetime): All features, perpetual access - ACTIVE
-- **Checkout Flow**: POST to `/api/stripe/checkout` with `tier` to generate Stripe checkout session URL.
+- **Pricing Tiers**: Scout ($29/mo), Hunter ($99/mo), Syndicate ($249/mo) with varying features and access levels.
 
 ### Build & Development
 - **Dev**: `npm run dev` (Express server with Vite middleware).
@@ -109,8 +70,7 @@ Preferred communication style: Simple, everyday language.
 - **Replit AI Integrations**: Powers the Hunter Intelligence Engine using `gemini-2.5-flash` model.
 
 ### Data Sources
-- **Direct Web Scraping**: Primary method - scrapes 14 marketplaces (iOS, Android, Chrome, Firefox, Shopify, WordPress, Slack, Zapier, Product Hunt, Flippa/Acquire, Microsoft Store, Salesforce, Atlassian, Gumroad) directly via HTTP requests. No API costs.
-- **SerpAPI (optional backup)**: Used as fallback when direct scraping returns <5 results. Not required for operation.
+- **SerpAPI**: Used for scraping Chrome Web Store and Shopify App Store to find distressed extensions and apps.
 
 ### Database
 - **PostgreSQL**: Primary database for all persistent data.
@@ -118,3 +78,28 @@ Preferred communication style: Simple, everyday language.
 ### Revenue Engine (Python/FastAPI)
 - **Distress Scanner**: Scans 8 marketplaces (Chrome Web Store, Shopify App Store, etc.) via SerpAPI for assets with >1,000 users and no updates in 6+ months.
 - **Hunter Intelligence**: Performs PE-style analysis with asset-specific pricing models and valuations (3-5x annual revenue). Generates valuations, MRR, strategies, cold emails, owner contacts, and negotiation scripts.
+
+## Recent Changes (December 2024)
+
+### Search Functionality
+- **Live Search**: Feed page now connects to `/api/scan` endpoint for real marketplace searches
+- **Debounced Search**: 500ms debounce before triggering API calls
+- **Search UI**: Added "Scan" button with loading spinner, search input shows scanning status
+- **Empty State**: When search returns 0 results, shows proper empty state with "Browse All Assets" button
+- **Fallback**: Shows curated mock assets when not actively searching
+
+### Pricing Model Update
+- **Removed**: "Asking Price" field (inappropriate for distressed private assets)
+- **Added**: "Est. Acquisition" calculated as 3x annual MRR (industry standard for distressed assets)
+- **Sort Options**: Changed "Lowest Price" to "Best Value" (sorts by lowest MRR for quick acquisitions)
+
+### Watchlist System
+- **Secure Endpoints**: All `/api/saved` endpoints require authentication
+- **Optimistic UI**: Save/unsave buttons show immediate feedback with loading spinners
+- **Toast Notifications**: Success/error feedback for watchlist operations
+
+### Feed Page Features
+- **Pagination**: 12 items per page with page navigation controls
+- **Filtering**: Category filter pills (Browser Extension, E-commerce, SaaS, etc.)
+- **Sorting**: Distress Score, Highest MRR, Most Users, Best Value options
+- **Asset Masking**: Non-premium users see masked asset names and descriptions
