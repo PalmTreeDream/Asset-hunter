@@ -1932,6 +1932,41 @@ Respond in JSON with: { "valuation": "...", "potential_mrr": "...", "the_play": 
     }
   });
 
+  // Create checkout session for Founding Member (one-time $149 payment)
+  app.post("/api/stripe/founding-member-checkout", async (req, res) => {
+    try {
+      const { getUncachableStripeClient } = await import("./stripeClient");
+      const stripe = await getUncachableStripeClient();
+      
+      const replitDomain = process.env.REPLIT_DOMAINS?.split(',')[0];
+      const baseUrl = replitDomain ? `https://${replitDomain}` : `http://localhost:5000`;
+      
+      const session = await stripe.checkout.sessions.create({
+        payment_method_types: ['card'],
+        line_items: [{
+          price_data: {
+            currency: 'usd',
+            product_data: {
+              name: 'Asset Hunter - Founding Member',
+              description: 'Lifetime access to Asset Hunter. Never pay monthly fees.',
+            },
+            unit_amount: 14900, // $149.00 in cents
+          },
+          quantity: 1,
+        }],
+        mode: 'payment',
+        success_url: `${baseUrl}/?checkout=success&plan=founding`,
+        cancel_url: `${baseUrl}/?checkout=cancel`,
+        metadata: { plan: 'founding_member' },
+      });
+
+      res.json({ url: session.url });
+    } catch (error: any) {
+      console.error("Founding member checkout error:", error.message);
+      res.status(500).json({ error: "Failed to create checkout session" });
+    }
+  });
+
   // Get user subscription status (session-based only for security)
   app.get("/api/user/subscription", async (req, res) => {
     // SECURITY: Only use session-based email - no query params allowed (prevents spoofing)

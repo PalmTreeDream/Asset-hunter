@@ -1116,6 +1116,27 @@ function ROIBreakdownSection() {
 function PricingSection() {
   const ref = useRef(null);
   const isInView = useInView(ref, { once: true, margin: "-100px" });
+  const [isCheckingOut, setIsCheckingOut] = useState(false);
+
+  const handleFoundingMemberCheckout = async () => {
+    setIsCheckingOut(true);
+    try {
+      const res = await fetch("/api/stripe/founding-member-checkout", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+      });
+      const data = await res.json();
+      if (data.url) {
+        window.location.href = data.url;
+      } else {
+        console.error("No checkout URL returned");
+        setIsCheckingOut(false);
+      }
+    } catch (error) {
+      console.error("Checkout error:", error);
+      setIsCheckingOut(false);
+    }
+  };
   
   const plans = [
     {
@@ -1246,10 +1267,11 @@ function PricingSection() {
                     : ''
                 }`}
                 variant={plan.featured ? 'default' : 'outline'}
-                disabled={plan.soldOut}
+                disabled={plan.soldOut || (plan.featured && isCheckingOut)}
+                onClick={plan.featured ? handleFoundingMemberCheckout : undefined}
                 data-testid={`button-pricing-${plan.name.toLowerCase().replace(' ', '-')}`}
               >
-                {plan.cta}
+                {plan.featured && isCheckingOut ? "Redirecting..." : plan.cta}
               </Button>
             </motion.div>
           ))}

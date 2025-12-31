@@ -29,7 +29,8 @@ import {
   ChevronRight,
   Bookmark,
   BookmarkCheck,
-  Loader2
+  Loader2,
+  X
 } from "lucide-react";
 import { SiGooglechrome, SiShopify, SiWordpress, SiSlack, SiFirefox } from "react-icons/si";
 import { motion } from "framer-motion";
@@ -411,85 +412,123 @@ const PRICING_TIERS = [
 ];
 
 function PaywallModal({ open, onClose }: { open: boolean; onClose: () => void }) {
+  const [isCheckingOut, setIsCheckingOut] = useState(false);
+  const [showOtherTiers, setShowOtherTiers] = useState(false);
+
+  const handleFoundingMemberCheckout = async () => {
+    setIsCheckingOut(true);
+    try {
+      const res = await fetch("/api/stripe/founding-member-checkout", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+      });
+      const data = await res.json();
+      if (data.url) {
+        window.location.href = data.url;
+      } else {
+        console.error("No checkout URL returned");
+        setIsCheckingOut(false);
+      }
+    } catch (error) {
+      console.error("Checkout error:", error);
+      setIsCheckingOut(false);
+    }
+  };
+
+  const foundingMember = PRICING_TIERS.find(t => t.featured);
+  const otherTiers = PRICING_TIERS.filter(t => !t.featured);
+
   return (
     <Dialog open={open} onOpenChange={onClose}>
-      <DialogContent className="sm:max-w-4xl bg-slate-950 border-slate-800 text-white">
-        <DialogHeader>
-          <DialogTitle className="text-2xl font-bold text-center">Unlock Full Asset Intelligence</DialogTitle>
-          <DialogDescription className="text-center text-slate-400">
-            Get contact info, detailed analysis, and acquisition playbooks
+      <DialogContent className="sm:max-w-md bg-slate-950 border-slate-800 text-white" data-testid="paywall-modal">
+        <DialogHeader className="pb-2">
+          <DialogTitle className="text-xl font-bold text-center">Unlock Full Intelligence</DialogTitle>
+          <DialogDescription className="text-center text-slate-400 text-sm">
+            Get contact info and acquisition playbooks
           </DialogDescription>
         </DialogHeader>
         
-        <div className="grid md:grid-cols-3 gap-4 mt-6">
-          {PRICING_TIERS.map((tier) => (
-            <div 
-              key={tier.name}
-              className={`relative rounded-xl p-5 ${
-                tier.featured 
-                  ? 'bg-slate-800 ring-2 ring-accent' 
-                  : 'bg-slate-900/50 border border-slate-800'
-              } ${tier.soldOut ? 'opacity-60' : ''}`}
-            >
-              {tier.soldOut && (
-                <Badge className="absolute -top-2 left-1/2 -translate-x-1/2 bg-red-500/20 text-red-400 border-red-500/30 text-xs">
-                  SOLD OUT
-                </Badge>
-              )}
-              {tier.featured && (
-                <Badge className="absolute -top-2 left-1/2 -translate-x-1/2 bg-accent/20 text-accent border-accent/30 text-xs">
-                  Best Value
-                </Badge>
-              )}
-              
-              <div className="text-center mb-4 pt-2">
-                <h3 className="font-semibold text-lg text-white" data-testid={`text-tier-name-${tier.name.toLowerCase().replace(' ', '-')}`}>{tier.name}</h3>
-                <div className="mt-2">
-                  <span className="text-3xl font-bold text-white" data-testid={`text-tier-price-${tier.name.toLowerCase().replace(' ', '-')}`}>{tier.price}</span>
-                  <span className="text-slate-400 text-sm">/{tier.period}</span>
+        {foundingMember && (
+          <div className="relative rounded-xl p-4 bg-slate-800 ring-2 ring-accent">
+            <Badge className="absolute -top-2 left-1/2 -translate-x-1/2 bg-accent/20 text-accent border-accent/30 text-xs">
+              Best Value
+            </Badge>
+            
+            <div className="flex items-center justify-between pt-2">
+              <div>
+                <h3 className="font-semibold text-white" data-testid="text-tier-name-founding-member">Founding Member</h3>
+                <div className="flex items-baseline gap-1">
+                  <span className="text-2xl font-bold text-white" data-testid="text-tier-price-founding-member">$149</span>
+                  <span className="text-slate-400 text-xs">lifetime</span>
                 </div>
-                {tier.soldOut && tier.cohort && (
-                  <p className="text-xs text-red-400 mt-2 font-medium" data-testid={`text-cohort-${tier.name.toLowerCase().replace(' ', '-')}`}>{tier.cohort}</p>
+              </div>
+              <div className="text-right">
+                <div className="flex items-center gap-1 text-indigo-400 text-xs font-medium">
+                  <Sparkles className="w-3 h-3 fill-indigo-400" />
+                  <span>{foundingMember.spotsRemaining} spots left</span>
+                </div>
+              </div>
+            </div>
+            
+            <div className="grid grid-cols-2 gap-x-3 gap-y-1 mt-3 text-xs text-slate-300">
+              {foundingMember.features.map((feature, i) => (
+                <div key={i} className="flex items-center gap-1">
+                  <CheckCircle className="w-3 h-3 text-accent shrink-0" />
+                  <span className="truncate">{feature}</span>
+                </div>
+              ))}
+            </div>
+            
+            <Button 
+              className="w-full mt-4 rounded-full bg-foreground text-background"
+              disabled={isCheckingOut}
+              onClick={handleFoundingMemberCheckout}
+              data-testid="button-tier-founding-member"
+            >
+              {isCheckingOut ? 'Redirecting...' : 'Secure Lifetime Access'}
+            </Button>
+          </div>
+        )}
+        
+        <p className="text-center text-xs text-slate-500">
+          One-time payment. No recurring fees.
+        </p>
+        
+        <button 
+          onClick={() => setShowOtherTiers(!showOtherTiers)}
+          className="text-xs text-slate-500 hover:text-slate-400 text-center flex items-center justify-center gap-1 mx-auto"
+          data-testid="button-show-other-tiers"
+        >
+          {showOtherTiers ? 'Hide' : 'View'} other plans (sold out)
+          <ChevronDown className={`w-3 h-3 transition-transform ${showOtherTiers ? 'rotate-180' : ''}`} />
+        </button>
+        
+        {showOtherTiers && (
+          <div className="space-y-2 pt-2">
+            {otherTiers.map((tier) => (
+              <div 
+                key={tier.name}
+                className="rounded-lg p-3 bg-slate-900/50 border border-slate-800 opacity-60"
+              >
+                <div className="flex items-center justify-between mb-2">
+                  <div className="flex items-center gap-2">
+                    <span className="font-medium text-sm text-white">{tier.name}</span>
+                    <Badge variant="outline" className="text-xs bg-red-500/10 text-red-400 border-red-500/20">
+                      Sold Out
+                    </Badge>
+                  </div>
+                  <span className="text-sm text-slate-400">{tier.price}/mo</span>
+                </div>
+                <div className="text-xs text-slate-500">
+                  {tier.features.slice(0, 2).join(' • ')}
+                </div>
+                {tier.cohort && (
+                  <p className="text-xs text-red-400 mt-1">{tier.cohort}</p>
                 )}
               </div>
-              
-              <ul className="space-y-2 mb-4">
-                {tier.features.map((feature, i) => (
-                  <li key={i} className="flex items-start gap-2 text-sm text-slate-300">
-                    <CheckCircle className="w-4 h-4 text-accent shrink-0 mt-0.5" />
-                    {feature}
-                  </li>
-                ))}
-              </ul>
-              
-              {tier.featured && tier.spotsRemaining && (
-                <div className="mb-3 p-2 rounded-lg bg-indigo-500/20 border border-indigo-500/30">
-                  <div className="flex items-center justify-center gap-2 text-indigo-400 font-bold text-xs tracking-wide">
-                    <Sparkles className="w-3 h-3 fill-indigo-400" />
-                    <span className="uppercase">{tier.spotsRemaining} Spots Remaining</span>
-                  </div>
-                </div>
-              )}
-              
-              <Button 
-                className={`w-full rounded-full ${
-                  tier.featured 
-                    ? 'bg-foreground text-background hover:bg-foreground/90' 
-                    : ''
-                }`}
-                variant={tier.featured ? 'default' : 'outline'}
-                disabled={tier.soldOut}
-                data-testid={`button-tier-${tier.name.toLowerCase().replace(' ', '-')}`}
-              >
-                {tier.soldOut ? 'Waitlist Full' : 'Secure Access'}
-              </Button>
-            </div>
-          ))}
-        </div>
-        
-        <p className="text-center text-xs text-slate-500 mt-4">
-          One-time payment. No recurring fees. Lifetime access to all features.
-        </p>
+            ))}
+          </div>
+        )}
       </DialogContent>
     </Dialog>
   );
