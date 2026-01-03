@@ -62,7 +62,7 @@ export default function Terms() {
             <section>
               <h2 className="text-xl font-semibold mb-4">4. Subscription and Payments</h2>
               <p className="text-muted-foreground leading-relaxed">
-                Paid subscriptions are billed monthly or annually as selected. All payments are processed securely 
+                Paid subscriptions are billed according to the plan selected. All payments are processed securely 
                 through Stripe. Subscriptions automatically renew unless cancelled before the renewal date. Refunds 
                 are handled on a case-by-case basis. You may cancel your subscription at any time through your 
                 account settings.

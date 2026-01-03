@@ -4,6 +4,9 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { AssetHunterLogo } from "@/components/AssetHunterLogo";
+import { useToast } from "@/hooks/use-toast";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
+import { apiRequest } from "@/lib/queryClient";
 import { 
   Target,
   Check,
@@ -15,7 +18,8 @@ import {
   Shield,
   CheckCircle,
   AlertTriangle,
-  Crown
+  Crown,
+  Sparkles
 } from "lucide-react";
 import { motion } from "framer-motion";
 
@@ -66,61 +70,111 @@ function PricingHeader() {
 }
 
 function PricingPlans() {
+  const { toast } = useToast();
+  const [showWaitlistModal, setShowWaitlistModal] = useState(false);
+  const [waitlistEmail, setWaitlistEmail] = useState("");
+  const [selectedTier, setSelectedTier] = useState<string>("scout");
+  const [isSubmitting, setIsSubmitting] = useState(false);
+
+  const handleWaitlistSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!waitlistEmail) return;
+    
+    setIsSubmitting(true);
+    try {
+      const res = await apiRequest("POST", "/api/waitlist", { 
+        email: waitlistEmail, 
+        tier: selectedTier 
+      });
+      const data = await res.json();
+      
+      if (res.ok) {
+        toast({ 
+          title: "You're on the list!", 
+          description: "We'll notify you when a spot opens up." 
+        });
+        setShowWaitlistModal(false);
+        setWaitlistEmail("");
+      } else if (res.status === 409) {
+        toast({ 
+          title: "Already registered", 
+          description: data.message || "You're already on the waitlist!" 
+        });
+      } else {
+        toast({ 
+          title: "Error", 
+          description: data.message || "Failed to join waitlist", 
+          variant: "destructive" 
+        });
+      }
+    } catch (err) {
+      toast({ 
+        title: "Error", 
+        description: "Failed to join waitlist. Please try again.", 
+        variant: "destructive" 
+      });
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
   const plans = [
     {
       name: "Scout",
       price: "$29",
       period: "/mo",
       description: "Find opportunities",
+      idealFor: "Casual Browsers",
       features: [
-        "30 scans per month",
-        "5 owner reveals",
+        "10 asset reveals / month",
         "5-axis Hunter Radar scoring",
         "MRR + valuation estimates",
-        "Marketplace confidence indicators",
-        "Risk & opportunity analysis",
-        "All 14 marketplaces"
+        "Confidence indicators"
       ],
-      cta: "Start free trial",
-      href: "/app",
+      cta: "Join Waitlist",
+      href: "/waitlist",
       popular: false,
+      soldOut: true,
       icon: Target
     },
     {
       name: "Hunter",
-      price: "$99",
+      price: "$49",
       period: "/mo",
       description: "Close deals",
+      idealFor: "Side Hustlers",
       features: [
-        "Unlimited scans + reveals",
-        "The Play: 30/90-day acquisition playbooks",
-        "Opening offer + walk-away prices",
-        "Verified owner email + LinkedIn",
-        "Owner motivation + leverage intel",
-        "3 cold email scripts + timing strategy",
-        "Priority support"
+        "50 asset reveals / month",
+        "No daily limit",
+        "30/90-day acquisition playbooks",
+        "Owner intel + cold emails"
       ],
-      cta: "Start hunting",
-      href: "/app",
-      popular: true,
+      cta: "Get Started",
+      href: "/api/checkout?tier=hunter",
+      popular: false,
+      soldOut: false,
+      spotsRemaining: 7,
       icon: Zap
     },
     {
-      name: "Portfolio",
-      price: "$249",
-      period: "/mo",
-      description: "Multi-asset operators",
+      name: "Founding Member",
+      price: "$149",
+      period: " One-Time",
+      description: "Lifetime Access. Cheaper than 4 months of Hunter.",
+      idealFor: "Serious Investors",
+      closingSoon: true,
       features: [
-        "Everything in Hunter",
-        "3 team seats",
-        "Full API access",
+        "300 reveals / month",
+        "Lifetime access - one payment",
         "Priority deal alerts",
-        "White-label reports",
-        "Dedicated account manager"
+        "Early access to new features"
       ],
-      cta: "Contact us",
-      href: "mailto:support@assethunter.io",
-      popular: false,
+      finePrint: "Fair Use Policy: 50 reveals/day",
+      cta: "Secure Lifetime Access",
+      href: "/api/checkout?tier=founding",
+      popular: true,
+      soldOut: false,
+      spotsRemaining: 4,
       icon: Crown
     }
   ];
@@ -129,23 +183,19 @@ function PricingPlans() {
     <section className="py-20 px-4 sm:px-6 lg:px-8">
       <div className="max-w-7xl mx-auto">
         <div className="text-center mb-16">
-          <Badge className="rounded-full px-4 py-1.5 bg-accent/10 text-accent border-accent/20 mb-6">
-            Private equity for solo operators
-          </Badge>
           <h1 className="text-4xl sm:text-5xl font-bold mb-4">
-            Invest in yourself.{" "}
+            Simple pricing.{" "}
             <span className="bg-gradient-to-r from-primary to-accent bg-clip-text text-transparent">
-              Own the upside.
+              Serious returns.
             </span>
           </h1>
           <p className="text-lg text-muted-foreground max-w-2xl mx-auto">
-            Stop paying brokers 15% of your deals. Find your own off-market opportunities and keep the returns.
+            One good acquisition pays for years of access.
           </p>
         </div>
 
-        <div className="grid md:grid-cols-3 gap-6 lg:gap-8">
+        <div className="grid md:grid-cols-3 gap-8 max-w-5xl mx-auto">
           {plans.map((plan, i) => {
-            const Icon = plan.icon;
             return (
               <motion.div
                 key={plan.name}
@@ -154,64 +204,122 @@ function PricingPlans() {
                 transition={{ duration: 0.5, delay: i * 0.1 }}
                 className={`relative glass-card rounded-3xl p-8 border ${
                   plan.popular 
-                    ? 'border-accent/50 shadow-soft-xl' 
-                    : 'border-border/30 shadow-soft-lg'
+                    ? 'ring-2 ring-accent shadow-lg shadow-accent/20' 
+                    : plan.soldOut ? 'opacity-60 border-border/30' : 'border-border/30 shadow-soft-lg'
                 }`}
-                data-testid={`card-plan-${plan.name.toLowerCase()}`}
+                data-testid={`card-plan-${plan.name.toLowerCase().replace(' ', '-')}`}
               >
-                {plan.popular && (
-                  <Badge className="absolute -top-3 left-1/2 -translate-x-1/2 rounded-full bg-accent text-white px-4 py-1">
-                    Most popular
+                {plan.soldOut && (
+                  <Badge className="absolute -top-3 left-1/2 -translate-x-1/2 rounded-full bg-red-500 text-white border-red-500">
+                    BETA FULL
+                  </Badge>
+                )}
+                {plan.closingSoon && (
+                  <Badge className="absolute -top-3 left-1/2 -translate-x-1/2 rounded-full bg-amber-500 text-white border-amber-500">
+                    CLOSING SOON
+                  </Badge>
+                )}
+                {!plan.soldOut && !plan.closingSoon && plan.spotsRemaining && (
+                  <Badge className="absolute -top-3 left-1/2 -translate-x-1/2 rounded-full bg-accent text-white border-accent">
+                    {plan.spotsRemaining} SPOTS LEFT
                   </Badge>
                 )}
                 
-                <div className="flex items-center gap-3 mb-4">
-                  <div className={`w-10 h-10 rounded-xl flex items-center justify-center ${
-                    plan.popular 
-                      ? 'bg-gradient-to-br from-accent to-emerald-400' 
-                      : 'bg-gradient-to-br from-primary/20 to-accent/20'
-                  }`}>
-                    <Icon className={`w-5 h-5 ${plan.popular ? 'text-white' : 'text-primary'}`} />
+                <div className="text-center mb-6">
+                  <h3 className="font-semibold text-foreground mb-1">{plan.name}</h3>
+                  <div className="text-3xl font-bold text-foreground">
+                    {plan.soldOut ? <span className="line-through text-muted-foreground">{plan.price}</span> : plan.price}
+                    <span className="text-base font-normal text-muted-foreground">{plan.period}</span>
                   </div>
-                  <div>
-                    <h3 className="text-xl font-bold text-foreground">{plan.name}</h3>
-                    <p className="text-sm text-muted-foreground">{plan.description}</p>
-                  </div>
-                </div>
-
-                <div className="flex items-baseline gap-1 mb-6">
-                  <span className="text-4xl font-bold text-foreground">{plan.price}</span>
-                  <span className="text-muted-foreground">{plan.period}</span>
+                  <p className="text-sm text-muted-foreground mt-1">{plan.description}</p>
+                  {plan.idealFor && (
+                    <p className="text-xs text-muted-foreground mt-2">
+                      <span className="font-medium">Ideal for:</span> {plan.idealFor}
+                    </p>
+                  )}
                 </div>
 
                 <ul className="space-y-3 mb-8">
                   {plan.features.map((feature) => (
-                    <li key={feature} className="flex items-start gap-3">
-                      <Check className="w-5 h-5 text-accent shrink-0 mt-0.5" />
-                      <span className="text-sm text-foreground">{feature}</span>
+                    <li key={feature} className="flex items-center gap-3 text-sm">
+                      <CheckCircle className={`w-4 h-4 shrink-0 ${plan.soldOut ? 'text-muted-foreground' : 'text-accent'}`} />
+                      <span className="text-muted-foreground">{feature}</span>
                     </li>
                   ))}
                 </ul>
 
+                {plan.spotsRemaining && (
+                  <div className="mb-4 p-3 rounded-lg bg-indigo-500/20 border border-indigo-500/30">
+                    <div className="flex items-center justify-center gap-2 text-indigo-400 font-bold text-sm tracking-wide">
+                      <Sparkles className="w-4 h-4 fill-indigo-400" />
+                      <span className="uppercase">{plan.spotsRemaining} Spots Remaining</span>
+                    </div>
+                  </div>
+                )}
+
+                {plan.finePrint && (
+                  <p className="text-xs text-muted-foreground/70 text-center mb-4 italic">
+                    {plan.finePrint}
+                  </p>
+                )}
+
                 <Button 
-                  asChild 
-                  className={`w-full rounded-xl ${
+                  className={`w-full rounded-full ${
                     plan.popular 
                       ? 'bg-foreground text-background hover:bg-foreground/90' 
-                      : 'bg-muted/50 hover:bg-muted'
+                      : ''
                   }`}
-                  data-testid={`button-plan-${plan.name.toLowerCase()}`}
+                  variant={plan.popular ? 'default' : 'outline'}
+                  onClick={() => {
+                    if (plan.soldOut) {
+                      // Open waitlist modal
+                      setSelectedTier(plan.name.toLowerCase());
+                      setShowWaitlistModal(true);
+                    } else if (plan.href.startsWith("/api/checkout")) {
+                      window.location.href = plan.href;
+                    } else if (plan.href === "/app") {
+                      window.location.href = "/app";
+                    }
+                  }}
+                  data-testid={`button-plan-${plan.name.toLowerCase().replace(' ', '-')}`}
                 >
-                  <Link href={plan.href}>
-                    {plan.cta}
-                    <ArrowRight className="w-4 h-4 ml-2" />
-                  </Link>
+                  {plan.cta}
                 </Button>
               </motion.div>
             );
           })}
         </div>
       </div>
+
+      {/* Waitlist Modal */}
+      <Dialog open={showWaitlistModal} onOpenChange={setShowWaitlistModal}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Join the {selectedTier.charAt(0).toUpperCase() + selectedTier.slice(1)} Waitlist</DialogTitle>
+            <DialogDescription>
+              We'll notify you as soon as a spot opens up.
+            </DialogDescription>
+          </DialogHeader>
+          <form onSubmit={handleWaitlistSubmit} className="space-y-4">
+            <Input
+              type="email"
+              placeholder="your@email.com"
+              value={waitlistEmail}
+              onChange={(e) => setWaitlistEmail(e.target.value)}
+              required
+              data-testid="input-waitlist-email"
+            />
+            <Button 
+              type="submit" 
+              className="w-full rounded-full" 
+              disabled={isSubmitting}
+              data-testid="button-waitlist-submit"
+            >
+              {isSubmitting ? "Joining..." : "Join Waitlist"}
+            </Button>
+          </form>
+        </DialogContent>
+      </Dialog>
     </section>
   );
 }
@@ -305,8 +413,8 @@ function NewsletterSection() {
 function FAQ() {
   const faqs = [
     {
-      q: "What's included in the free trial?",
-      a: "You get full access to the Scout plan for 7 days. That includes 30 scans across all 14 marketplaces, 5-axis Hunter Radar scoring, MRR estimates, and 5 owner reveals."
+      q: "How many reveals do I get?",
+      a: "Scout includes 10 reveals, Hunter includes 50 reveals/month with no daily limits, and Founding Member includes 300 reveals/month with a 50/day fair use limit."
     },
     {
       q: "What is the 5-axis Hunter Radar?",

@@ -1,4 +1,4 @@
-import { pgTable, text, serial, integer, boolean, timestamp, jsonb } from "drizzle-orm/pg-core";
+import { pgTable, text, serial, integer, boolean, timestamp, jsonb, real } from "drizzle-orm/pg-core";
 import { relations } from "drizzle-orm";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
@@ -136,6 +136,34 @@ export const insertWeeklyStatsSchema = createInsertSchema(weeklyStats).omit({ id
 export type WeeklyStats = typeof weeklyStats.$inferSelect;
 export type InsertWeeklyStats = z.infer<typeof insertWeeklyStatsSchema>;
 
+// === WAITLIST ===
+export const waitlist = pgTable("waitlist", {
+  id: serial("id").primaryKey(),
+  email: text("email").notNull().unique(),
+  tier: text("tier").notNull().default("scout"),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const insertWaitlistSchema = createInsertSchema(waitlist).omit({ id: true, createdAt: true });
+export type Waitlist = typeof waitlist.$inferSelect;
+export type InsertWaitlist = z.infer<typeof insertWaitlistSchema>;
+
+// === USER CREDITS ===
+export const userCredits = pgTable("user_credits", {
+  id: serial("id").primaryKey(),
+  userId: text("user_id").notNull().unique(),
+  tier: text("tier").notNull().default("scout"), // scout, hunter, founding_member
+  credits: integer("credits").notNull().default(0), // Total remaining credits
+  monthlyAllowance: integer("monthly_allowance").notNull().default(0), // 0 for fixed tiers, 300 for founding_member
+  dailyLimit: integer("daily_limit").notNull().default(0), // 0 for no limit, 15 for founding_member
+  dailyUsed: integer("daily_used").notNull().default(0), // Credits used today
+  lastDailyReset: timestamp("last_daily_reset").defaultNow(), // When daily counter was last reset
+  lastMonthlyReset: timestamp("last_monthly_reset").defaultNow(), // When monthly credits were last refilled
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export type UserCredits = typeof userCredits.$inferSelect;
+
 // === MAGIC LINK TOKENS (for secure email verification) ===
 export const magicLinkTokens = pgTable("magic_link_tokens", {
   id: serial("id").primaryKey(),
@@ -185,3 +213,125 @@ export const savedAssets = pgTable("saved_assets", {
 export const insertSavedAssetSchema = createInsertSchema(savedAssets).omit({ id: true, createdAt: true });
 export type SavedAsset = typeof savedAssets.$inferSelect;
 export type InsertSavedAsset = z.infer<typeof insertSavedAssetSchema>;
+
+// === SCANNED ASSETS (Asset Discovery Tracking) ===
+// Stores all assets discovered during marketplace scans for tracking over time
+export const scannedAssets = pgTable("scanned_assets", {
+  id: serial("id").primaryKey(),
+  externalId: text("external_id").notNull(), // Unique ID from marketplace (Chrome extension ID, Shopify app slug, etc.)
+  marketplace: text("marketplace").notNull(), // "chrome", "shopify", "wordpress", "firefox", "slack", etc.
+  name: text("name").notNull(),
+  url: text("url").notNull(),
+  description: text("description"),
+  users: integer("users").default(0), // User/install count
+  rating: real("rating"), // Store rating (e.g., 4.5)
+  ratingCount: integer("rating_count"), // Number of ratings
+  lastUpdatedByOwner: timestamp("last_updated_by_owner"), // When the asset was last updated by owner
+  estimatedMrr: integer("estimated_mrr").default(0), // Calculated MRR using formulas
+  distressScore: integer("distress_score").default(0), // Calculated distress score (0-100)
+  category: text("category"), // App category/niche
+  tags: text("tags").array(), // Keywords/tags
+  rawData: jsonb("raw_data"), // Full API response for reference
+  firstSeenAt: timestamp("first_seen_at").defaultNow(), // When we first discovered this asset
+  lastScannedAt: timestamp("last_scanned_at").defaultNow(), // Most recent scan that found it
+  createdAt: timestamp("created_at").defaultNow(),
+  
+  // === ENHANCED FIELDS FOR RICH DETAIL VIEW ===
+  // Historical trends (12-month snapshots stored as JSON arrays)
+  userHistory: jsonb("user_history"), // [{ month: "2025-01", users: 45000 }, ...]
+  mrrHistory: jsonb("mrr_history"), // [{ month: "2025-01", mrr: 2500 }, ...]
+  
+  // Hunter Intelligence scores (0-10 scale for radar chart)
+  distressAxis: real("distress_axis").default(5), // Abandonment signals (higher = more distressed)
+  monetizationAxis: real("monetization_axis").default(5), // Revenue gap opportunity (higher = better)
+  technicalAxis: real("technical_axis").default(5), // Technical risk (higher = more risk)
+  marketAxis: real("market_axis").default(5), // Market position strength (higher = stronger)
+  flipAxis: real("flip_axis").default(5), // Flip potential (higher = easier flip)
+  
+  // Qualitative insights
+  distressSignals: text("distress_signals").array(), // ["No updates in 18 months", "Support email bounces"]
+  riskFactors: text("risk_factors").array(), // ["Manifest V2 sunset", "Single point of failure"]
+  opportunities: text("opportunities").array(), // ["Premium tier could add $1K MRR", "Cross-platform expansion"]
+  
+  // Owner/contact info (revealed after credit spend)
+  ownerEmail: text("owner_email"), // Contact email
+  ownerName: text("owner_name"), // Owner name
+  linkedinUrl: text("linkedin_url"), // Owner LinkedIn
+  githubUrl: text("github_url"), // Related GitHub repo
+  
+  // Competitive positioning
+  competitors: jsonb("competitors"), // [{ name: "Competitor A", users: 100000, rating: 4.2 }]
+  marketSharePct: real("market_share_pct"), // Estimated market share in niche (0-100)
+  
+  // Acquisition details
+  askingPrice: integer("asking_price"), // Owner's asking price if known
+  estimatedValue: integer("estimated_value"), // Our calculated 3x annual revenue valuation
+  negotiationNotes: text("negotiation_notes"), // AI-generated negotiation strategy
+});
+
+export const insertScannedAssetSchema = createInsertSchema(scannedAssets).omit({ id: true, createdAt: true, firstSeenAt: true });
+export type ScannedAsset = typeof scannedAssets.$inferSelect;
+export type InsertScannedAsset = z.infer<typeof insertScannedAssetSchema>;
+
+// Type definitions for JSON fields in ScannedAsset
+export interface UserHistoryPoint {
+  month: string; // "2025-01" format
+  users: number;
+}
+
+export interface MrrHistoryPoint {
+  month: string; // "2025-01" format
+  mrr: number;
+}
+
+export interface CompetitorData {
+  name: string;
+  users: number;
+  rating?: number;
+  url?: string;
+}
+
+// Helper type for fully typed scanned asset with JSON fields
+export interface ScannedAssetFull extends Omit<ScannedAsset, 'userHistory' | 'mrrHistory' | 'competitors'> {
+  userHistory?: UserHistoryPoint[];
+  mrrHistory?: MrrHistoryPoint[];
+  competitors?: CompetitorData[];
+}
+
+// === REVEALED ASSETS (Track which assets users have unlocked with credits) ===
+export const revealedAssets = pgTable("revealed_assets", {
+  id: serial("id").primaryKey(),
+  userId: text("user_id").notNull(), // User email or Replit ID
+  assetId: text("asset_id").notNull(), // Asset identifier (e.g., "AH-123")
+  revealedAt: timestamp("revealed_at").defaultNow(),
+});
+
+export const insertRevealedAssetSchema = createInsertSchema(revealedAssets).omit({ id: true, revealedAt: true });
+export type RevealedAsset = typeof revealedAssets.$inferSelect;
+export type InsertRevealedAsset = z.infer<typeof insertRevealedAssetSchema>;
+
+// === OUTREACH LOG (Track contact attempts to asset owners) ===
+export const outreachLogs = pgTable("outreach_logs", {
+  id: serial("id").primaryKey(),
+  userId: text("user_id").notNull(), // User who sent the outreach
+  assetId: text("asset_id").notNull(), // Asset being contacted about
+  assetName: text("asset_name").notNull(), // Asset name for display
+  marketplace: text("marketplace").notNull(), // Asset marketplace
+  channel: text("channel").notNull().default("email"), // "email", "linkedin", "phone", "other"
+  status: text("status").notNull().default("sent"), // "sent", "awaiting_reply", "replied", "follow_up", "closed"
+  subject: text("subject"), // Email subject or message topic
+  notes: text("notes"), // User notes about the conversation
+  sentAt: timestamp("sent_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export const insertOutreachLogSchema = createInsertSchema(outreachLogs).omit({ id: true, sentAt: true, updatedAt: true });
+export type OutreachLog = typeof outreachLogs.$inferSelect;
+export type InsertOutreachLog = z.infer<typeof insertOutreachLogSchema>;
+
+// Validation schema for outreach status updates
+export const updateOutreachLogSchema = z.object({
+  status: z.enum(['sent', 'awaiting_reply', 'replied', 'follow_up', 'closed']).optional(),
+  notes: z.string().optional(),
+});
+export type UpdateOutreachLog = z.infer<typeof updateOutreachLogSchema>;

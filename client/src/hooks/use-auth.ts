@@ -41,6 +41,7 @@ export function useAuth() {
     user,
     isLoading,
     isAuthenticated: !!user,
+    isPremium: user?.plan !== "free",
     logout: logoutMutation.mutate,
     isLoggingOut: logoutMutation.isPending,
   };

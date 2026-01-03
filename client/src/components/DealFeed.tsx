@@ -3,7 +3,23 @@ import { MiniHunterRadar, type HunterRadarScores } from "./HunterRadar";
 import { ConfidenceBadge, MarketplaceBadge, type MarketplaceConfidence } from "./ConfidenceBadge";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { ExternalLink, TrendingUp, Users, AlertTriangle, Eye, DollarSign, Calendar, Target } from "lucide-react";
+import { ExternalLink, TrendingUp, TrendingDown, Users, AlertTriangle, Eye, DollarSign, Calendar, Target, CheckCircle, Mail, Github, Linkedin } from "lucide-react";
+
+// Enrichment data - premium features that justify payment
+export interface EnrichmentData {
+  verified?: boolean; // Owner contact confirmed
+  trend?: {
+    direction: "up" | "down" | "stable";
+    percentage: number; // e.g., 120 for +120%
+  };
+  githubActivity?: {
+    score: number; // 0-100
+  };
+  contactAvailable?: {
+    email?: boolean;
+    linkedin?: boolean;
+  };
+}
 
 export interface DealAsset {
   id: string;
@@ -29,6 +45,8 @@ export interface DealAsset {
   };
   lastUpdated?: string;
   distressSignals?: string[];
+  // Enrichment data (premium)
+  enrichment?: EnrichmentData;
 }
 
 interface AssetCardProps {
@@ -36,9 +54,10 @@ interface AssetCardProps {
   onAnalyze?: (asset: DealAsset) => void;
   onView?: (asset: DealAsset) => void;
   isLoading?: boolean;
+  isPremium?: boolean; // Gate enrichment data for non-premium users
 }
 
-function AssetCard({ asset, onAnalyze, onView, isLoading }: AssetCardProps) {
+function AssetCard({ asset, onAnalyze, onView, isLoading, isPremium = false }: AssetCardProps) {
   const [isHovered, setIsHovered] = useState(false);
 
   const defaultRadar: HunterRadarScores = {
@@ -90,6 +109,36 @@ function AssetCard({ asset, onAnalyze, onView, isLoading }: AssetCardProps) {
                 >
                   {statusLabels[asset.status]}
                 </Badge>
+                {/* Enrichment badges - premium data only */}
+                {isPremium && asset.enrichment?.verified && (
+                  <Badge 
+                    variant="outline" 
+                    className="text-xs font-mono bg-viz-green/10 text-viz-green border-viz-green/30"
+                  >
+                    <CheckCircle className="w-3 h-3 mr-1" />
+                    Verified
+                  </Badge>
+                )}
+                {isPremium && asset.enrichment?.trend && (
+                  <Badge 
+                    variant="outline" 
+                    className={`text-xs font-mono ${
+                      asset.enrichment.trend.direction === "up" 
+                        ? "bg-viz-green/10 text-viz-green border-viz-green/30"
+                        : asset.enrichment.trend.direction === "down"
+                          ? "bg-viz-red/10 text-viz-red border-viz-red/30"
+                          : "bg-panel-foreground/10 text-panel-foreground/70 border-panel-foreground/20"
+                    }`}
+                  >
+                    {asset.enrichment.trend.direction === "up" ? (
+                      <TrendingUp className="w-3 h-3 mr-1" />
+                    ) : asset.enrichment.trend.direction === "down" ? (
+                      <TrendingDown className="w-3 h-3 mr-1" />
+                    ) : null}
+                    {asset.enrichment.trend.direction === "up" ? "+" : asset.enrichment.trend.direction === "down" ? "-" : ""}
+                    {asset.enrichment.trend.percentage}%
+                  </Badge>
+                )}
               </div>
             </div>
           </div>
@@ -169,6 +218,36 @@ function AssetCard({ asset, onAnalyze, onView, isLoading }: AssetCardProps) {
               <span className="truncate">{asset.distressSignals[0]}</span>
             </div>
           )}
+
+          {/* Enrichment row - premium data only */}
+          {isPremium && asset.enrichment && (asset.enrichment.contactAvailable || asset.enrichment.githubActivity) && (
+            <div className="flex items-center justify-between gap-2 pt-2 border-t border-viz-grid/20">
+              {/* Contact availability */}
+              {asset.enrichment.contactAvailable && (
+                <div className="flex items-center gap-2">
+                  {asset.enrichment.contactAvailable.email && (
+                    <div className="flex items-center gap-1 text-[10px] text-viz-green font-mono">
+                      <Mail className="w-3 h-3" />
+                      <span>Email</span>
+                    </div>
+                  )}
+                  {asset.enrichment.contactAvailable.linkedin && (
+                    <div className="flex items-center gap-1 text-[10px] text-blue-400 font-mono">
+                      <Linkedin className="w-3 h-3" />
+                      <span>LinkedIn</span>
+                    </div>
+                  )}
+                </div>
+              )}
+              {/* GitHub activity */}
+              {asset.enrichment.githubActivity && (
+                <div className="flex items-center gap-1 text-[10px] text-panel-foreground/70 font-mono">
+                  <Github className="w-3 h-3" />
+                  <span>Activity: {asset.enrichment.githubActivity.score}/100</span>
+                </div>
+              )}
+            </div>
+          )}
         </div>
 
         <div className="flex items-center justify-between gap-2 px-3 pb-3">
@@ -215,6 +294,7 @@ interface DealFeedProps {
   loadingAssetId?: string | null;
   emptyMessage?: string;
   className?: string;
+  isPremium?: boolean; // Gate enrichment data for non-premium users
 }
 
 export function DealFeed({
@@ -224,6 +304,7 @@ export function DealFeed({
   loadingAssetId,
   emptyMessage = "No assets found. Run a scan to discover opportunities.",
   className = "",
+  isPremium = false,
 }: DealFeedProps) {
   if (assets.length === 0) {
     return (
@@ -246,6 +327,7 @@ export function DealFeed({
           onAnalyze={onAnalyze}
           onView={onView}
           isLoading={loadingAssetId === asset.id}
+          isPremium={isPremium}
         />
       ))}
     </div>

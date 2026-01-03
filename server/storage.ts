@@ -10,12 +10,14 @@ import {
   magicLinkTokens,
   contactSubmissions,
   savedAssets,
+  scannedAssets,
+  outreachLogs,
   type Lead,
   type InsertLead,
   type UpdateLeadRequest,
   type Insight,
   type User,
-  type InsertUser,
+  type UpsertUser,
   type NewsletterSignup,
   type InsertNewsletterSignup,
   type NewsletterSubscription,
@@ -30,6 +32,10 @@ import {
   type InsertContactSubmission,
   type SavedAsset,
   type InsertSavedAsset,
+  type ScannedAsset,
+  type InsertScannedAsset,
+  type OutreachLog,
+  type InsertOutreachLog,
 } from "@shared/schema";
 import { eq, desc, sql, and, isNull, gt } from "drizzle-orm";
 
@@ -46,7 +52,7 @@ export interface IStorage {
   // User operations
   getUser(id: string): Promise<User | undefined>;
   getUserByEmail(email: string): Promise<User | undefined>;
-  createUser(user: InsertUser): Promise<User>;
+  createUser(user: UpsertUser): Promise<User>;
   updateUserStripeInfo(userId: string, info: { stripeCustomerId?: string; stripeSubscriptionId?: string; plan?: string }): Promise<User>;
   
   // Newsletter operations
@@ -77,6 +83,7 @@ export interface IStorage {
   listProductsWithPrices(active?: boolean): Promise<any[]>;
   getPrice(priceId: string): Promise<any>;
   getSubscription(subscriptionId: string): Promise<any>;
+  getSubscriptionsByCustomerId(customerId: string): Promise<any[]>;
   
   // Magic link token operations (for secure email verification)
   createMagicLinkToken(email: string, token: string, expiresAt: Date): Promise<MagicLinkToken>;
@@ -91,6 +98,22 @@ export interface IStorage {
   unsaveAsset(userId: string, assetId: string): Promise<void>;
   getSavedAssets(userId: string): Promise<SavedAsset[]>;
   isAssetSaved(userId: string, assetId: string): Promise<boolean>;
+  
+  // Scanned assets (discovery tracking) operations
+  upsertScannedAsset(asset: InsertScannedAsset): Promise<ScannedAsset>;
+  upsertScannedAssets(assets: InsertScannedAsset[]): Promise<number>;
+  getScannedAsset(externalId: string, marketplace: string): Promise<ScannedAsset | undefined>;
+  getScannedAssetById(id: number): Promise<ScannedAsset | undefined>;
+  getScannedAssetsCount(): Promise<number>;
+  getScannedAssetsCountThisWeek(): Promise<number>;
+  getScannedAssetsCountToday(): Promise<number>;
+  getRecentScannedAssets(limit?: number): Promise<ScannedAsset[]>;
+  getScannedAssets(): Promise<ScannedAsset[]>;
+  
+  // Outreach log operations
+  getOutreachLogs(userId: string): Promise<OutreachLog[]>;
+  createOutreachLog(log: InsertOutreachLog): Promise<OutreachLog>;
+  updateOutreachLog(id: number, userId: string, updates: { status?: string; notes?: string }): Promise<OutreachLog | undefined>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -148,7 +171,7 @@ export class DatabaseStorage implements IStorage {
     return user;
   }
 
-  async createUser(user: InsertUser): Promise<User> {
+  async createUser(user: UpsertUser): Promise<User> {
     const [created] = await db.insert(users).values(user).returning();
     return created;
   }
@@ -313,6 +336,13 @@ export class DatabaseStorage implements IStorage {
     return result.rows[0] || null;
   }
 
+  async getSubscriptionsByCustomerId(customerId: string): Promise<any[]> {
+    const result = await db.execute(
+      sql`SELECT * FROM stripe.subscriptions WHERE customer = ${customerId}`
+    );
+    return result.rows || [];
+  }
+
   // Magic link token operations
   async createMagicLinkToken(email: string, token: string, expiresAt: Date): Promise<MagicLinkToken> {
     const [created] = await db.insert(magicLinkTokens).values({
@@ -387,6 +417,117 @@ export class DatabaseStorage implements IStorage {
       )
     );
     return !!found;
+  }
+  
+  // Scanned assets (discovery tracking) operations
+  async upsertScannedAsset(asset: InsertScannedAsset): Promise<ScannedAsset> {
+    const existing = await this.getScannedAsset(asset.externalId, asset.marketplace);
+    if (existing) {
+      const [updated] = await db.update(scannedAssets)
+        .set({
+          name: asset.name,
+          url: asset.url,
+          description: asset.description,
+          users: asset.users,
+          rating: asset.rating,
+          ratingCount: asset.ratingCount,
+          lastUpdatedByOwner: asset.lastUpdatedByOwner,
+          estimatedMrr: asset.estimatedMrr,
+          distressScore: asset.distressScore,
+          category: asset.category,
+          tags: asset.tags,
+          rawData: asset.rawData,
+          lastScannedAt: new Date(),
+        })
+        .where(eq(scannedAssets.id, existing.id))
+        .returning();
+      return updated;
+    }
+    const [created] = await db.insert(scannedAssets).values(asset).returning();
+    return created;
+  }
+  
+  async upsertScannedAssets(assets: InsertScannedAsset[]): Promise<number> {
+    let count = 0;
+    for (const asset of assets) {
+      try {
+        await this.upsertScannedAsset(asset);
+        count++;
+      } catch (e) {
+        console.error(`Failed to upsert asset ${asset.externalId}:`, e);
+      }
+    }
+    return count;
+  }
+  
+  async getScannedAsset(externalId: string, marketplace: string): Promise<ScannedAsset | undefined> {
+    const [found] = await db.select().from(scannedAssets).where(
+      and(
+        eq(scannedAssets.externalId, externalId),
+        eq(scannedAssets.marketplace, marketplace)
+      )
+    );
+    return found;
+  }
+  
+  async getScannedAssetById(id: number): Promise<ScannedAsset | undefined> {
+    const [found] = await db.select().from(scannedAssets).where(eq(scannedAssets.id, id));
+    return found;
+  }
+  
+  async getScannedAssetsCount(): Promise<number> {
+    const result = await db.select({ count: sql<number>`count(*)` }).from(scannedAssets);
+    return Number(result[0]?.count || 0);
+  }
+  
+  async getScannedAssetsCountThisWeek(): Promise<number> {
+    const weekAgo = new Date();
+    weekAgo.setDate(weekAgo.getDate() - 7);
+    const result = await db.select({ count: sql<number>`count(*)` }).from(scannedAssets)
+      .where(gt(scannedAssets.firstSeenAt, weekAgo));
+    return Number(result[0]?.count || 0);
+  }
+  
+  async getScannedAssetsCountToday(): Promise<number> {
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const result = await db.select({ count: sql<number>`count(*)` }).from(scannedAssets)
+      .where(gt(scannedAssets.firstSeenAt, today));
+    return Number(result[0]?.count || 0);
+  }
+  
+  async getRecentScannedAssets(limit = 20): Promise<ScannedAsset[]> {
+    return await db.select().from(scannedAssets)
+      .orderBy(desc(scannedAssets.firstSeenAt))
+      .limit(limit);
+  }
+
+  async getScannedAssets(): Promise<ScannedAsset[]> {
+    return await db.select().from(scannedAssets)
+      .orderBy(desc(scannedAssets.distressScore));
+  }
+  
+  // Outreach log operations
+  async getOutreachLogs(userId: string): Promise<OutreachLog[]> {
+    return await db.select().from(outreachLogs)
+      .where(eq(outreachLogs.userId, userId))
+      .orderBy(desc(outreachLogs.sentAt));
+  }
+  
+  async createOutreachLog(log: InsertOutreachLog): Promise<OutreachLog> {
+    const [created] = await db.insert(outreachLogs).values(log).returning();
+    return created;
+  }
+  
+  async updateOutreachLog(id: number, userId: string, updates: { status?: string; notes?: string }): Promise<OutreachLog | undefined> {
+    const [updated] = await db.update(outreachLogs)
+      .set({
+        ...updates,
+        updatedAt: new Date(),
+      })
+      .where(and(eq(outreachLogs.id, id), eq(outreachLogs.userId, userId)))
+      .returning();
+    return updated;
   }
 }
 

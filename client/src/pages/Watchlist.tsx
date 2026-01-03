@@ -3,22 +3,38 @@ import { Link } from "wouter";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Card } from "@/components/ui/card";
+import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription } from "@/components/ui/sheet";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { AssetHunterLogo } from "@/components/AssetHunterLogo";
+import { HunterRadar } from "@/components/HunterRadar";
 import { useAuth } from "@/hooks/use-auth";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
+import { MobileNav } from "@/components/MobileNav";
 import { 
   AlertTriangle, 
   BookmarkCheck,
   Trash2,
   Users,
   TrendingUp,
+  TrendingDown,
   ExternalLink,
   Search,
-  Loader2
+  Loader2,
+  Heart,
+  Calendar,
+  Globe,
+  Lock,
+  Mail,
+  Sparkles,
+  CheckCircle,
+  ChevronRight
 } from "lucide-react";
 import { SiGooglechrome, SiShopify, SiWordpress, SiSlack, SiFirefox } from "react-icons/si";
 import { motion } from "framer-motion";
+import { AssetDetailSheet } from "@/components/AssetDetailSheet";
+import { useQuery, useMutation } from "@tanstack/react-query";
+import { queryClient } from "@/lib/queryClient";
 
 interface SavedAsset {
   id: number;
@@ -59,23 +75,29 @@ function formatCurrency(num: number): string {
 function SavedAssetCard({ 
   asset, 
   onRemove,
+  onViewDetails,
   isRemoving
 }: { 
   asset: SavedAsset;
   onRemove: () => void;
+  onViewDetails: () => void;
   isRemoving: boolean;
 }) {
   const Icon = getMarketplaceIcon(asset.marketplace);
   
   return (
-    <Card className="bg-white dark:bg-slate-900/80 border-slate-200 dark:border-slate-800 overflow-hidden hover:border-slate-300 dark:hover:border-slate-700 transition-colors" data-testid={`card-saved-${asset.assetId}`}>
-      <div className="p-5">
-        <div className="flex items-start justify-between mb-3">
-          <div className="flex items-center gap-2 flex-wrap gap-y-1">
-            <Badge variant="secondary" className="text-xs bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400">
+    <Card 
+      className="bg-white dark:bg-slate-900/80 border-slate-200 dark:border-slate-800 overflow-hidden hover:border-slate-300 dark:hover:border-slate-700 transition-colors cursor-pointer w-full max-w-full" 
+      data-testid={`card-saved-${asset.assetId}`}
+      onClick={onViewDetails}
+    >
+      <div className="p-5 overflow-hidden">
+        <div className="flex items-start justify-between mb-3 gap-2">
+          <div className="flex items-center gap-2 flex-wrap gap-y-1 min-w-0 flex-1">
+            <Badge variant="secondary" className="text-xs bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 shrink-0">
               {asset.marketplace}
             </Badge>
-            <Badge variant="outline" className="text-xs border-slate-200 dark:border-slate-700 text-slate-500">
+            <Badge variant="outline" className="text-xs border-slate-200 dark:border-slate-700 text-slate-500 shrink-0">
               <AlertTriangle className="w-3 h-3 mr-1" />
               Distress: {asset.distressScore}%
             </Badge>
@@ -83,8 +105,8 @@ function SavedAssetCard({
           <Button 
             variant="ghost" 
             size="icon" 
-            className="text-slate-400 hover:text-red-500"
-            onClick={onRemove}
+            className="text-slate-400 hover:text-red-500 shrink-0"
+            onClick={(e) => { e.stopPropagation(); onRemove(); }}
             disabled={isRemoving}
             data-testid={`button-remove-${asset.assetId}`}
           >
@@ -92,18 +114,19 @@ function SavedAssetCard({
           </Button>
         </div>
         
-        <div className="flex items-start gap-3 mb-4">
+        <div className="flex items-start gap-3 mb-4 min-w-0">
           <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-slate-100 to-slate-200 dark:from-slate-700 dark:to-slate-800 flex items-center justify-center shrink-0">
             <Icon className="w-5 h-5 text-slate-600 dark:text-slate-300" />
           </div>
-          <div className="min-w-0">
+          <div className="min-w-0 flex-1 overflow-hidden">
             <h3 className="font-semibold text-slate-900 dark:text-white text-base truncate" data-testid={`text-name-${asset.assetId}`}>
               {asset.assetName}
             </h3>
-            <p className="text-sm text-slate-500 dark:text-slate-400 line-clamp-2">
+            <p className="text-sm text-slate-500 dark:text-slate-400 line-clamp-2 break-words">
               {asset.description || "Software asset with acquisition potential"}
             </p>
           </div>
+          <ChevronRight className="w-4 h-4 text-slate-400 shrink-0 mt-1" />
         </div>
         
         <div className="flex items-center gap-3 py-3 px-3 bg-slate-50 dark:bg-slate-800/50 rounded-lg mb-4">
@@ -131,51 +154,43 @@ function SavedAssetCard({
 }
 
 export default function Watchlist() {
-  const { user } = useAuth();
+  const { user, isPremium } = useAuth();
   const { toast } = useToast();
-  const [savedAssets, setSavedAssets] = useState<SavedAsset[]>([]);
-  const [loading, setLoading] = useState(true);
   const [removingId, setRemovingId] = useState<string | null>(null);
-  
-  useEffect(() => {
-    loadSavedAssets();
-  }, []);
-  
-  const loadSavedAssets = async () => {
-    try {
-      setLoading(true);
-      const response = await fetch('/api/saved');
-      if (response.ok) {
-        const data = await response.json();
-        setSavedAssets(data.assets || []);
-      }
-    } catch (error) {
-      console.error('Failed to load saved assets:', error);
-    } finally {
-      setLoading(false);
-    }
-  };
-  
-  const handleRemoveAsset = async (assetId: string) => {
-    setRemovingId(assetId);
-    try {
-      await apiRequest('DELETE', `/api/saved/${assetId}`);
-      setSavedAssets(prev => prev.filter(a => a.assetId !== assetId));
+  const [selectedAsset, setSelectedAsset] = useState<any | null>(null);
+  const [showDetail, setShowDetail] = useState(false);
+
+  const { data: savedAssets = [], isLoading: loading } = useQuery<SavedAsset[]>({
+    queryKey: ["/api/saved"],
+  });
+
+  const removeMutation = useMutation({
+    mutationFn: async (assetId: string) => {
+      await apiRequest("DELETE", `/api/saved/${assetId}`);
+    },
+    onSuccess: (_, assetId) => {
+      queryClient.invalidateQueries({ queryKey: ["/api/saved"] });
       toast({
         title: "Removed from watchlist",
         description: "Asset has been removed from your watchlist"
       });
-    } catch (error: any) {
+    },
+    onError: (error: any) => {
       toast({
         title: "Error",
         description: error.message || "Failed to remove asset",
         variant: "destructive"
       });
-    } finally {
-      setRemovingId(null);
     }
+  });
+
+  const handleRemoveAsset = (assetId: string) => {
+    setRemovingId(assetId);
+    removeMutation.mutate(assetId, {
+      onSettled: () => setRemovingId(null)
+    });
   };
-  
+
   if (!user) {
     return (
       <div className="min-h-screen bg-slate-50 dark:bg-slate-950 flex items-center justify-center">
@@ -196,7 +211,7 @@ export default function Watchlist() {
   }
   
   return (
-    <div className="min-h-screen bg-slate-50 dark:bg-slate-950">
+    <div className="min-h-screen bg-slate-50 dark:bg-slate-950 overflow-x-hidden">
       <header className="sticky top-0 z-50 bg-white dark:bg-slate-950/95 backdrop-blur-sm border-b border-slate-200 dark:border-slate-800">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex items-center justify-between h-14">
@@ -270,6 +285,10 @@ export default function Watchlist() {
                   <SavedAssetCard 
                     asset={asset}
                     onRemove={() => handleRemoveAsset(asset.assetId)}
+                    onViewDetails={() => {
+                      setSelectedAsset(asset);
+                      setShowDetail(true);
+                    }}
                     isRemoving={removingId === asset.assetId}
                   />
                 </motion.div>
@@ -278,6 +297,25 @@ export default function Watchlist() {
           </>
         )}
       </main>
+      
+      <MobileNav />
+      
+      {/* Asset Detail Sheet */}
+      {selectedAsset && (
+        <AssetDetailSheet
+          open={showDetail}
+          onClose={() => setShowDetail(false)}
+          asset={selectedAsset.assetData}
+          isSaved={true}
+          isSaving={removingId === selectedAsset.assetId}
+          onSave={() => handleRemoveAsset(selectedAsset.assetId)}
+          isPremium={isPremium}
+          isRevealed={selectedAsset.assetData?.isRevealed}
+          onUnlock={() => {}}
+          onReveal={() => {}}
+          creditsRemaining={0}
+        />
+      )}
     </div>
   );
 }

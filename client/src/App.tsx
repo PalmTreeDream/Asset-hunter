@@ -16,21 +16,46 @@ import Dashboard from "@/pages/Dashboard";
 import Hunt from "@/pages/Hunt";
 import Feed from "@/pages/Feed";
 import Watchlist from "@/pages/Watchlist";
+import Inbox from "@/pages/Inbox";
 import LeadDetail from "@/pages/LeadDetail";
 import Settings from "@/pages/Settings";
 import Pulse from "@/pages/Pulse";
 import Login from "@/pages/Login";
+import Signup from "@/pages/Signup";
 import Pricing from "@/pages/Pricing";
 import Contact from "@/pages/Contact";
 import Terms from "@/pages/Terms";
 import Privacy from "@/pages/Privacy";
+import AssetDetail from "@/pages/AssetDetail";
 import NotFound from "@/pages/not-found";
+import { useAuth } from "@/hooks/use-auth";
+
+function ProtectedRoute({ component: Component }: { component: React.ComponentType }) {
+  const { user, isLoading } = useAuth();
+  const [, setLocation] = useLocation();
+  
+  if (isLoading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-background">
+        <Loader2 className="w-8 h-8 animate-spin text-muted-foreground" />
+      </div>
+    );
+  }
+  
+  if (!user) {
+    setLocation("/signup");
+    return null;
+  }
+  
+  return <Component />;
+}
 
 function AppRouter() {
   return (
     <Switch>
       <Route path="/hunt" component={Hunt} />
       <Route path="/watchlist" component={Watchlist} />
+      <Route path="/inbox" component={Inbox} />
       <Route path="/leads/:id" component={LeadDetail} />
       <Route path="/settings" component={Settings} />
       <Route path="/pulse" component={Pulse} />
@@ -183,8 +208,9 @@ function App() {
   const [location] = useLocation();
   
   // Marketing pages that bypass the app layout (have their own headers)
-  const marketingPages = ["/", "/login", "/pricing", "/contact", "/terms", "/privacy", "/feed", "/app"];
-  const isMarketingPage = marketingPages.includes(location);
+  const isAssetDetailPage = location.startsWith("/asset/");
+  const marketingPages = ["/", "/login", "/signup", "/pricing", "/contact", "/terms", "/privacy", "/feed", "/app"];
+  const isMarketingPage = marketingPages.includes(location) || isAssetDetailPage;
   
   return (
     <QueryClientProvider client={queryClient}>
@@ -193,11 +219,13 @@ function App() {
           <Switch>
             <Route path="/" component={Landing} />
             <Route path="/login" component={Login} />
+            <Route path="/signup" component={Signup} />
             <Route path="/pricing" component={Pricing} />
             <Route path="/contact" component={Contact} />
             <Route path="/terms" component={Terms} />
             <Route path="/privacy" component={Privacy} />
-            <Route path="/feed" component={Feed} />
+            <Route path="/feed">{() => <ProtectedRoute component={Feed} />}</Route>
+            <Route path="/asset/:id">{() => <ProtectedRoute component={AssetDetail} />}</Route>
             <Route path="/app">{() => <Redirect to="/feed" />}</Route>
           </Switch>
         ) : (

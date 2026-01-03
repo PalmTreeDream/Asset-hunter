@@ -31,7 +31,18 @@ Preferred communication style: Simple, everyday language.
 
 ### Data Storage
 - **Database**: PostgreSQL via Drizzle ORM.
-- **Core Tables**: `sessions`, `users`, `leads`, `insights`, `conversations`, `messages`, `newsletter_signups`, `newsletter_subscriptions`.
+- **Core Tables**: `sessions`, `users`, `leads`, `insights`, `conversations`, `messages`, `newsletter_signups`, `newsletter_subscriptions`, `outreach_logs`.
+
+### Outreach Tracking System
+- **Purpose**: CRM-style tracking of acquisition outreach to asset owners.
+- **Database Table**: `outreach_logs` with fields for assetId, assetName, marketplace, channel, status, subject, notes, sentAt, updatedAt.
+- **Status Workflow**: sent → awaiting_reply → replied → follow_up → closed
+- **API Endpoints**:
+  - `GET /api/outreach` - List all outreach logs for authenticated user
+  - `POST /api/outreach` - Create new outreach log (validated with Zod schema)
+  - `PATCH /api/outreach/:id` - Update status/notes (validated with Zod schema)
+- **Frontend**: Inbox page with status filter tabs, editable notes dialog, react-query integration with cache invalidation
+- **Integration**: Email button in Feed/AssetDetailSheet automatically logs outreach attempts
 
 ### Authentication
 - **Provider**: Replit OIDC via `openid-client` and `passport`.
@@ -57,7 +68,10 @@ Preferred communication style: Simple, everyday language.
 
 ### Payments
 - **Provider**: Stripe via `stripe-replit-sync`.
-- **Pricing Tiers**: Scout ($29/mo), Hunter ($99/mo), Syndicate ($249/mo) with varying features and access levels.
+- **Pricing Tiers**: 
+  - Scout ($29/mo): 10 reveals/month, waitlist-only (Beta Full), ideal for "Casual Browsers"
+  - Hunter ($49/mo): 50 reveals/month, NOW AVAILABLE (7 spots left), no daily limit, ideal for "Side Hustlers"
+  - Founding Member ($149 lifetime): 300 reveals/month (max 50/day fair use), lifetime access, "Closing Soon" badge, ideal for "Serious Investors"
 
 ### Build & Development
 - **Dev**: `npm run dev` (Express server with Vite middleware).
@@ -103,3 +117,80 @@ Preferred communication style: Simple, everyday language.
 - **Filtering**: Category filter pills (Browser Extension, E-commerce, SaaS, etc.)
 - **Sorting**: Distress Score, Highest MRR, Most Users, Best Value options
 - **Asset Masking**: Non-premium users see masked asset names and descriptions
+
+### Landing Page Updates (December 2024)
+- **Removed**: "Deal Intelligence Terminal" section (LiveDemoSection) for cleaner landing page
+- **ROI Breakdown Section**: Added soft white-to-green gradient background with dark mode support
+- **Card Animations**: ROI cards now have hover pop animation (scale: 1.03, y: -4px) using framer-motion
+
+### Feed Page Asset Card Redesign (December 2024)
+- **Simplified Layout**: Removed empty fields (Revenue, Profit, Growth, Churn)
+- **Fixed Duplicate Badges**: Replaced category badge with platform badge showing icon
+- **New Metrics**: Shows Est. MRR, Users, calculated Distress score (avg of 3 metrics)
+- **Calculated Fields**: Est. Acquisition (3x annual MRR), Annual Revenue (MRR × 12)
+- **Fixed React Keys**: Tags now use unique keys (`${tag}-${idx}`) to prevent warnings
+
+### Asset Tracking System (January 2025)
+- **New Table**: `scanned_assets` tracks discovered assets over time
+- **Fields**: externalId, marketplace, name, url, users, rating, estimatedMrr, distressScore, firstSeenAt, lastScannedAt
+- **De-duplication**: Unique index on (external_id, marketplace) prevents duplicate entries
+- **Auto-save**: `/api/engine/scan` now saves discovered assets to database (non-blocking)
+- **Stats API**: New `/api/stats/assets` endpoint for aggregate discovery statistics
+
+### Landing Page Copy Overhaul (January 2025)
+- **Copy Style**: Thiel x Jobs style (5th grade reading level, punchy, poetic)
+- **Hero Headline**: "Skip the build. Buy the users."
+- **Hero Subheadline**: "Real apps. Real revenue. Found first."
+- **Status Ticker**: "New assets added daily" (static, always true)
+- **Removed**: Badge clutter ("Private equity for solo operators")
+- **Stats Pills**: Descriptive ("We search 14 app stores", "Find dormant apps", "Before anyone else")
+- **Value Props**: Simplified language, removed jargon ("distress signals" → "dormant apps")
+- **Terminology**: "dormant" replaces "distressed" or "forgotten" throughout copy
+
+### Waitlist & Credit System (January 2025)
+- **Waitlist API**: New `/api/waitlist` endpoint with email validation, tier tracking, and duplicate handling (409 for existing emails)
+- **Database Tables**: Added `waitlist` and `user_credits` tables to store waitlist signups and user credit balances
+- **Credit Amounts (Updated January 2025)**: 
+  - Scout: 10 reveals (fixed, no daily limit)
+  - Hunter: 50 reveals (fixed, no daily limit) - NOW AVAILABLE at $49/mo with 7 spots
+  - Founding Member: 300 reveals/month, max 50/day fair use (updated from 15/day)
+- **Credit Schema Fields**: tier, credits, monthlyAllowance, dailyLimit, dailyUsed, lastDailyReset, lastMonthlyReset
+- **Lazy Reset Logic**: On each reveal, checks if daily/monthly counters need reset based on timestamps
+- **Credit APIs**: 
+  - `POST /api/credits/initialize` - Initialize credits when user subscribes (sets tier-specific limits)
+  - `GET /api/credits` - Get current credit balance (includes dailyUsed, dailyLimit for progressive disclosure)
+  - `POST /api/assets/:id/reveal` - Reveal asset, enforces daily (50) and monthly (300) limits for Founding Member
+- **Server-side Masking**: `/api/scanned-assets` masks asset names, descriptions, and URLs for non-premium users
+- **Pricing Page**: "Join Waitlist" buttons open modal for email collection on sold-out tiers (Scout only now)
+- **Session Extension**: Added `userId` field to express-session interface for credit tracking
+- **Progressive Disclosure**: Daily limit banner only shows after 10 reveals with positive messaging ("You're on fire today!")
+- **Ideal For Sections**: Added user persona descriptions to each pricing tier (Casual Browsers, Side Hustlers, Serious Investors)
+- **Feed Header Navigation**: Added Watchlist link accessible from Feed page header
+
+### Mobile Navigation (January 2025)
+- **MobileNav Component**: New component (`client/src/components/MobileNav.tsx`) with 4 nav items (Listings, Watchlist, Inbox, Profile)
+- **Visibility**: Shows only on mobile viewports (< 1024px) via `lg:hidden` class
+- **Fixed Position**: Bottom of viewport with safe-area padding for modern devices
+- **Active State**: Current route highlighted in indigo color
+- **Integration**: Added to Feed and AssetDetail pages with responsive bottom padding (pb-24 lg:pb-8)
+
+### Asset Detail Page (January 2025)
+- **Dedicated Route**: `/asset/:id` for viewing asset details
+- **Rich Visualizations**: Hunter Radar chart, MRR/User trend charts (Recharts)
+- **Tabbed Interface**: Overview, Hunter Intelligence, Competitors (premium), Owner Contact (revealed)
+- **Reveal Integration**: Server-side gating of sensitive fields until asset is revealed
+- **Mobile-First**: Responsive design with bottom padding for mobile nav
+
+### Authentication Gate (January 2025)
+- **Protected Routes**: Feed and AssetDetail require authentication
+- **Signup Page**: `/signup` with email/password form, social login options, value proposition sidebar
+- **ProtectedRoute Component**: Redirects unauthenticated users to /signup
+
+### Enhanced Schema (January 2025)
+- **scanned_assets Extended Fields**:
+  - Historical metrics: `usersHistory`, `mrrHistory` (JSON arrays)
+  - Hunter Intelligence axes: `hunterDistress`, `hunterMonetization`, `hunterTechnical`, `hunterMarket`, `hunterFlip`
+  - Qualitative insights: `distressSignals`, `riskFactors`, `opportunities` (text arrays)
+  - Owner contact: `ownerName`, `ownerEmail`, `linkedinUrl`, `githubUrl`
+  - Competitive: `competitorsData` (JSON), `marketPositionNote`
+- **TypeScript Interfaces**: `UserHistoryPoint`, `MrrHistoryPoint`, `CompetitorData`, `ScannedAssetFull`

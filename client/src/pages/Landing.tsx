@@ -3,6 +3,7 @@ import { Link } from "wouter";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
+import { Card } from "@/components/ui/card";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { AssetHunterLogo } from "@/components/AssetHunterLogo";
@@ -10,7 +11,8 @@ import { useAuth } from "@/hooks/use-auth";
 import { 
   Search, 
   Target,
-  TrendingUp, 
+  TrendingUp,
+  TrendingDown,
   Mail, 
   CheckCircle, 
   ArrowRight,
@@ -20,8 +22,12 @@ import {
   DollarSign,
   AlertTriangle,
   Menu,
+  X,
   User,
-  LogOut
+  LogOut,
+  Linkedin,
+  Github,
+  Wrench
 } from "lucide-react";
 import { Sheet, SheetContent, SheetTrigger, SheetTitle, SheetDescription } from "@/components/ui/sheet";
 import { VisuallyHidden } from "@radix-ui/react-visually-hidden";
@@ -43,12 +49,21 @@ function LandingHeader() {
     return () => window.removeEventListener('scroll', handleScroll);
   }, []);
 
-  const navItems = [
-    { label: "Product", href: "/app" },
+  const authenticatedNavItems = [
+    { label: "Feed", href: "/feed" },
+    { label: "Watchlist", href: "/watchlist" },
+    { label: "Inbox", href: "/inbox" },
+    { label: "Pricing", href: "/pricing" },
+  ];
+
+  const unauthenticatedNavItems = [
+    { label: "Product", href: "/feed" },
     { label: "Pricing", href: "/pricing" },
     { label: "Contact", href: "/contact" },
     { label: "Newsletter", href: "#newsletter" },
   ];
+
+  const navItems = isAuthenticated ? authenticatedNavItems : unauthenticatedNavItems;
   
   const handleLogin = () => {
     window.location.href = "/api/login";
@@ -193,105 +208,112 @@ function LandingHeader() {
                 <Menu className="w-5 h-5" />
               </Button>
             </SheetTrigger>
-            <SheetContent side="right" className="w-[300px] sm:w-[350px] p-0">
+            <SheetContent side="right" className="w-full sm:w-[380px] p-0 border-l border-white/5 bg-slate-950/95 backdrop-blur-2xl">
               <VisuallyHidden>
                 <SheetTitle>Navigation Menu</SheetTitle>
                 <SheetDescription>Main navigation and newsletter options</SheetDescription>
               </VisuallyHidden>
-              <div className="flex flex-col h-full">
+              <div className="flex flex-col h-full text-white">
                 {/* Mobile Menu Header */}
-                <div className="flex items-center justify-between p-4 border-b border-border">
-                  <div className="flex items-center gap-2">
-                    <AssetHunterLogo size="md" />
-                    <span className="font-semibold text-lg logo-text">AssetHunter</span>
+                <div className="flex items-center justify-between p-8 border-b border-white/5">
+                  <div className="flex items-center gap-3">
+                    <AssetHunterLogo size="lg" className="shadow-emerald-500/20 shadow-lg" />
+                    <span className="font-bold text-xl tracking-tight">
+                      Asset<span className="text-emerald-400 font-extrabold">Hunter</span>
+                    </span>
                   </div>
+                  <Button variant="ghost" size="icon" onClick={() => setMobileMenuOpen(false)} className="rounded-full text-slate-400">
+                    <X className="w-6 h-6" />
+                  </Button>
                 </div>
                 
                 {/* Mobile Navigation Links */}
-                <nav className="flex-1 py-6">
-                  <div className="space-y-1 px-4">
-                    <Link href="/app" onClick={() => setMobileMenuOpen(false)}>
-                      <div className="flex items-center gap-3 px-4 py-3 rounded-xl hover-elevate cursor-pointer" data-testid="link-mobile-product">
-                        <Search className="w-5 h-5 text-muted-foreground" />
-                        <span className="font-medium">Product</span>
-                      </div>
-                    </Link>
-                    <Link href="/pricing" onClick={() => setMobileMenuOpen(false)}>
-                      <div className="flex items-center gap-3 px-4 py-3 rounded-xl hover-elevate cursor-pointer" data-testid="link-mobile-pricing">
-                        <DollarSign className="w-5 h-5 text-muted-foreground" />
-                        <span className="font-medium">Pricing</span>
-                      </div>
-                    </Link>
-                    <Link href="/contact" onClick={() => setMobileMenuOpen(false)}>
-                      <div className="flex items-center gap-3 px-4 py-3 rounded-xl hover-elevate cursor-pointer" data-testid="link-mobile-contact">
-                        <Mail className="w-5 h-5 text-muted-foreground" />
-                        <span className="font-medium">Contact</span>
-                      </div>
-                    </Link>
-                    <button 
-                      onClick={scrollToNewsletter}
-                      className="w-full flex items-center gap-3 px-4 py-3 rounded-xl hover-elevate text-left"
-                      data-testid="link-mobile-newsletter"
-                    >
-                      <Mail className="w-5 h-5 text-muted-foreground" />
-                      <span className="font-medium">Newsletter</span>
-                    </button>
+                <nav className="flex-1 py-10 px-6">
+                  <div className="space-y-2">
+                    {navItems.map((item) => (
+                      item.href === "#newsletter" ? (
+                        <button 
+                          key={item.label}
+                          onClick={scrollToNewsletter}
+                          className="w-full flex items-center gap-4 px-6 py-4 rounded-2xl hover:bg-white/5 transition-all group"
+                          data-testid={`link-mobile-${item.label.toLowerCase()}`}
+                        >
+                          <div className="w-10 h-10 rounded-xl bg-white/5 flex items-center justify-center group-hover:bg-white/10 transition-colors">
+                            <Mail className="w-5 h-5 text-slate-400 group-hover:text-white" />
+                          </div>
+                          <span className="font-semibold text-lg tracking-wide">{item.label}</span>
+                        </button>
+                      ) : (
+                        <Link key={item.label} href={item.href} onClick={() => setMobileMenuOpen(false)}>
+                          <div className="flex items-center gap-4 px-6 py-4 rounded-2xl hover:bg-white/5 transition-all group cursor-pointer" data-testid={`link-mobile-${item.label.toLowerCase()}`}>
+                            <div className="w-10 h-10 rounded-xl bg-white/5 flex items-center justify-center group-hover:bg-white/10 transition-colors">
+                              {item.label === "Product" || item.label === "Feed" ? <Search className="w-5 h-5 text-slate-400 group-hover:text-white" /> :
+                               item.label === "Pricing" ? <DollarSign className="w-5 h-5 text-slate-400 group-hover:text-white" /> :
+                               item.label === "Watchlist" ? <Eye className="w-5 h-5 text-slate-400 group-hover:text-white" /> :
+                               item.label === "Inbox" ? <Mail className="w-5 h-5 text-slate-400 group-hover:text-white" /> :
+                               <Mail className="w-5 h-5 text-slate-400 group-hover:text-white" />}
+                            </div>
+                            <span className="font-semibold text-lg tracking-wide">{item.label}</span>
+                          </div>
+                        </Link>
+                      )
+                    ))}
                   </div>
                   
-                  {/* Free Newsletter */}
-                  <div className="mt-6 px-4">
-                    <button 
-                      onClick={scrollToNewsletter}
-                      className="w-full text-left px-4 py-3 rounded-xl bg-muted/30 border border-border/50 hover-elevate active-elevate-2 cursor-pointer transition-all"
-                      data-testid="button-tier-free"
+                  {/* Premium Tier Card */}
+                  <div className="mt-12">
+                    <div 
+                      className="relative p-6 rounded-3xl bg-gradient-to-br from-emerald-500/10 to-emerald-900/10 border border-emerald-500/20 overflow-hidden group"
+                      data-testid="mobile-premium-card"
                     >
-                      <div className="flex items-center gap-2 mb-1">
-                        <Badge variant="secondary" className="text-xs rounded-full">Free Newsletter</Badge>
-                        <ChevronRight className="w-3 h-3 text-muted-foreground ml-auto" />
+                      <div className="absolute top-0 right-0 w-32 h-32 bg-emerald-500/10 blur-3xl -mr-16 -mt-16" />
+                      <div className="relative z-10">
+                        <Badge className="bg-emerald-400 text-slate-950 font-bold mb-3 rounded-full uppercase tracking-tighter text-[10px]">Beta Access</Badge>
+                        <h4 className="text-xl font-bold mb-2">Hunter Engine v2.5</h4>
+                        <p className="text-sm text-slate-400 mb-6 leading-relaxed">Access 14 marketplaces with proprietary distress signal detection.</p>
+                        <Button className="w-full bg-emerald-400 text-slate-950 hover:bg-emerald-300 font-bold rounded-2xl h-12 shadow-lg shadow-emerald-500/20">
+                          {isAuthenticated ? "Upgrade Plan" : "Get Early Access"}
+                        </Button>
                       </div>
-                      <p className="text-sm text-muted-foreground">Weekly digest of top opportunities</p>
-                    </button>
+                    </div>
                   </div>
                 </nav>
                 
-                {/* Mobile Menu Footer CTAs */}
-                <div className="p-4 border-t border-border space-y-3">
+                {/* Mobile Menu Footer */}
+                <div className="p-8 border-t border-white/5 bg-white/[0.02]">
                   {isAuthenticated && user ? (
-                    <>
-                      <div className="flex items-center gap-3 px-2 py-2">
-                        <Avatar className="h-10 w-10">
-                          <AvatarImage src={user.profileImageUrl || undefined} alt={user.firstName || "User"} />
-                          <AvatarFallback className="bg-accent text-accent-foreground">
+                    <div className="space-y-6">
+                      <div className="flex items-center gap-4">
+                        <Avatar className="h-12 w-12 border-2 border-emerald-500/20 p-0.5">
+                          <AvatarImage src={user.profileImageUrl || undefined} alt={user.firstName || "User"} className="rounded-full" />
+                          <AvatarFallback className="bg-emerald-500/10 text-emerald-400 font-bold">
                             {getUserInitials()}
                           </AvatarFallback>
                         </Avatar>
                         <div className="flex-1 min-w-0">
-                          <p className="text-sm font-medium truncate">{user.firstName} {user.lastName}</p>
-                          <p className="text-xs text-muted-foreground truncate">{user.email}</p>
+                          <p className="text-lg font-bold truncate">{user.firstName} {user.lastName}</p>
+                          <p className="text-sm text-slate-500 truncate font-mono tracking-tighter uppercase">Premium Member</p>
                         </div>
                       </div>
-                      <Button asChild className="w-full rounded-xl bg-foreground text-background hover:bg-foreground/90" data-testid="button-mobile-dashboard">
-                        <Link href="/app" onClick={() => setMobileMenuOpen(false)}>Go to Dashboard</Link>
-                      </Button>
-                      <Button 
-                        variant="outline" 
-                        className="w-full rounded-xl" 
-                        onClick={() => { setMobileMenuOpen(false); logout(); }}
-                        data-testid="button-mobile-logout"
-                      >
-                        <LogOut className="w-4 h-4 mr-2" />
-                        Log out
-                      </Button>
-                    </>
+                      <div className="grid grid-cols-2 gap-4">
+                        <Button variant="outline" className="rounded-2xl border-white/10 hover:bg-white/5 text-white" onClick={() => { setMobileMenuOpen(false); logout(); }}>
+                          <LogOut className="w-4 h-4 mr-2" />
+                          Logout
+                        </Button>
+                        <Button asChild className="rounded-2xl bg-white text-slate-950 hover:bg-slate-200 font-bold">
+                          <Link href="/feed" onClick={() => setMobileMenuOpen(false)}>Dashboard</Link>
+                        </Button>
+                      </div>
+                    </div>
                   ) : (
-                    <>
-                      <Button className="w-full rounded-xl bg-foreground text-background hover:bg-foreground/90" onClick={() => { setMobileMenuOpen(false); handleLogin(); }} data-testid="button-mobile-start">
-                        Start free scan
+                    <div className="grid grid-cols-2 gap-4">
+                      <Button variant="outline" className="rounded-2xl border-white/10 hover:bg-white/5 text-white h-14 text-lg font-semibold" onClick={() => { setMobileMenuOpen(false); handleLogin(); }}>
+                        Login
                       </Button>
-                      <Button variant="outline" className="w-full rounded-xl" onClick={() => { setMobileMenuOpen(false); handleLogin(); }} data-testid="button-mobile-login">
-                        Log in
+                      <Button className="rounded-2xl bg-emerald-400 text-slate-950 hover:bg-emerald-300 h-14 text-lg font-bold shadow-lg shadow-emerald-500/20" onClick={() => { setMobileMenuOpen(false); handleLogin(); }}>
+                        Sign Up
                       </Button>
-                    </>
+                    </div>
                   )}
                 </div>
               </div>
@@ -300,6 +322,7 @@ function LandingHeader() {
         </div>
       </div>
     </header>
+
   );
 }
 
@@ -320,49 +343,45 @@ function HeroSection() {
       <div className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="grid lg:grid-cols-2 gap-12 items-center min-h-[calc(100vh-200px)]">
           <div className="space-y-8">
-            {/* Status Ticker */}
-            <motion.div
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.5 }}
-              className="flex flex-col gap-3"
-            >
-              <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-red-500/20 border border-red-500/30 w-fit">
-                <div className="w-2 h-2 rounded-full bg-red-500 animate-pulse" />
-                <span className="text-sm font-medium text-red-400">46 High-Distress Deals Surfaced Today</span>
-              </div>
-              <Badge className="rounded-full px-4 py-1.5 bg-accent/20 text-accent border-accent/30 w-fit">
-                <Target className="w-3 h-3 mr-2" />
-                Private equity for solo operators
-              </Badge>
-            </motion.div>
-            
+            {/* Headline First - Thiel x Jobs style */}
             <motion.h1 
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.6, delay: 0.1 }}
+              transition={{ duration: 0.6 }}
               className="text-4xl sm:text-5xl lg:text-6xl font-bold leading-[1.1] tracking-tight text-white"
             >
-              Buy software businesses{" "}
+              Skip the build.{" "}
               <span className="bg-gradient-to-r from-accent to-primary bg-clip-text text-transparent">
-                before brokers see them.
+                Buy the users.
               </span>
             </motion.h1>
             
             <motion.p 
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.6, delay: 0.2 }}
-              className="text-lg text-slate-300 max-w-lg leading-relaxed"
+              transition={{ duration: 0.6, delay: 0.1 }}
+              className="text-xl text-slate-300 max-w-lg leading-relaxed"
             >
-              We scan 14 marketplaces for abandoned apps with real revenue. 
-              Stop building from scratch. Buy Day 1 income.
+              Private apps. Real revenue. Found first.
             </motion.p>
+            
+            {/* Status Ticker - simplified */}
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.5, delay: 0.15 }}
+              className="flex flex-col gap-3"
+            >
+              <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-accent/20 border border-accent/30 w-fit">
+                <div className="w-2 h-2 rounded-full bg-accent animate-pulse" />
+                <span className="text-sm font-medium text-accent">New assets added daily</span>
+              </div>
+            </motion.div>
             
             <motion.div 
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.6, delay: 0.3 }}
+              transition={{ duration: 0.6, delay: 0.2 }}
               className="flex flex-col sm:flex-row gap-4"
             >
               <Button 
@@ -381,18 +400,17 @@ function HeroSection() {
             <motion.div 
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
-              transition={{ duration: 0.6, delay: 0.4 }}
+              transition={{ duration: 0.6, delay: 0.3 }}
               className="flex flex-wrap items-center gap-4 pt-4"
             >
               <div className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-white/10 border border-white/20">
-                <div className="w-2 h-2 rounded-full bg-accent animate-pulse" />
-                <span className="text-sm"><span className="font-semibold text-white">312</span> <span className="text-slate-400">surfaced this week</span></span>
+                <span className="text-sm text-slate-300"><span className="font-semibold text-white">14</span> private sources</span>
               </div>
               <div className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-white/10 border border-white/20">
-                <span className="text-sm"><span className="font-semibold text-orange-400">46</span> <span className="text-slate-400">high-distress</span></span>
+                <span className="text-sm text-slate-300"><span className="font-semibold text-amber-400">Dormant</span> apps with users</span>
               </div>
               <div className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-white/10 border border-white/20">
-                <span className="text-sm"><span className="font-semibold text-primary">9</span> <span className="text-slate-400">under review</span></span>
+                <span className="text-sm text-slate-300"><span className="font-semibold text-emerald-400">Direct</span> owner contact</span>
               </div>
             </motion.div>
           </div>
@@ -492,7 +510,7 @@ function MarketplaceIcons() {
       <div className="absolute inset-0 bg-gradient-to-b from-background via-muted/30 to-background" />
       <div className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <p className="text-center text-sm text-muted-foreground mb-8">
-          Scanning off-market opportunities across <span className="font-semibold text-foreground">14 marketplaces</span>
+          We search <span className="font-semibold text-foreground">14 app stores</span> for dormant assets
         </p>
         <div className="flex flex-wrap items-center justify-center gap-4 md:gap-6">
           {marketplaces.map((m, i) => (
@@ -545,89 +563,102 @@ function TrustedBySection() {
   );
 }
 
-// Featured Opportunities Section - shows real names for marketing on homepage
+// Featured Opportunities Section - shows example opportunities with realistic data
+// Note: We show data we can actually obtain from marketplace scanning
 function FeaturedOpportunitiesSection() {
   const ref = useRef(null);
   const isInView = useInView(ref, { once: true, margin: "-100px" });
   
+  // Featured examples with realistic Est. MRR calculated using industry formulas:
+  // Chrome/Firefox: 2% conversion × $4/mo avg = users × 0.02 × $4
+  // Shopify: 5% conversion × $29/mo avg = installs × 0.05 × $29
+  // WordPress: 3% conversion × $12/mo avg = installs × 0.03 × $12
+  // Slack: 10% conversion × 8 seats × $8/seat = workspaces × 0.1 × 64
   const featuredAssets = [
     {
       id: "AH-47291",
-      name: "AI-Powered Marketing SaaS",
-      description: "B2B platform helping companies automate their marketing workflows with AI.",
-      category: "SaaS",
+      name: "Tab Manager Extension",
+      description: "Chrome extension with 50K+ users, last updated 18 months ago. Manifest V2 migration creates acquisition opportunity.",
+      category: "Browser Extension",
+      users: "52,000",
+      estMrr: "$4,160",
+      distressScore: 87,
+      lastUpdate: "18 months ago",
+      icon: SiGooglechrome,
       verified: true,
-      revenue: "$420K ARR",
-      profit: "$180K",
-      mrr: "$35K",
-      growth: "+85%",
-      users: "2,400",
-      icon: SiWordpress
+      trend: { direction: "down" as const, percentage: 15 },
+      contactAvailable: { email: true, linkedin: true }
     },
     {
       id: "AH-38472",
-      name: "E-commerce Fashion Brand",
-      description: "Direct-to-consumer sustainable fashion brand with strong social media presence.",
-      category: "E-commerce",
+      name: "Inventory Sync App",
+      description: "Shopify app managing multi-channel inventory. 3,200 merchants with declining support response times.",
+      category: "Shopify App",
+      users: "3,200",
+      estMrr: "$4,640",
+      distressScore: 72,
+      lastUpdate: "8 months ago",
+      icon: SiShopify,
       verified: true,
-      revenue: "$1.2M",
-      profit: "$340K",
-      mrr: "$100K",
-      growth: "+120%",
-      users: "45K",
-      icon: SiShopify
+      trend: { direction: "stable" as const, percentage: 2 },
+      contactAvailable: { email: true }
     },
     {
       id: "AH-29183",
-      name: "Mobile Fitness App",
-      description: "iOS and Android fitness tracking app with subscription model and engaged community.",
-      category: "Mobile App",
+      name: "SEO Toolkit Plugin",
+      description: "WordPress plugin with 28K active installs. Owner seeking exit after 5 years of development.",
+      category: "WordPress Plugin",
+      users: "28,000",
+      estMrr: "$10,080",
+      distressScore: 65,
+      lastUpdate: "6 months ago",
+      icon: SiWordpress,
       verified: true,
-      revenue: "$280K ARR",
-      profit: "$95K",
-      mrr: "$23K",
-      growth: "+65%",
-      users: "8,500",
-      icon: SiApple
+      trend: { direction: "up" as const, percentage: 8 },
+      contactAvailable: { email: true, linkedin: true },
+      githubActivity: 72
     },
     {
-      id: "AH-51029",
-      name: "Data Analytics Platform",
-      description: "Enterprise analytics solution serving Fortune 500 companies across multiple industries.",
-      category: "SaaS",
-      verified: true,
-      revenue: "$850K ARR",
-      profit: "$420K",
-      mrr: "$71K",
-      growth: "+95%",
-      users: "150",
-      icon: SiGoogle
+      id: "AH-51294",
+      name: "Screenshot Capture Pro",
+      description: "Firefox add-on with loyal user base. No updates in 2 years, consistent 4.5 star rating.",
+      category: "Browser Extension",
+      users: "18,500",
+      estMrr: "$1,480",
+      distressScore: 82,
+      lastUpdate: "24 months ago",
+      icon: SiFirefox,
+      verified: false,
+      trend: { direction: "down" as const, percentage: 28 },
+      contactAvailable: { email: true }
     },
     {
-      id: "AH-62841",
-      name: "Content Creation Tool",
-      description: "AI-powered content creation platform for marketers and content creators.",
-      category: "SaaS",
+      id: "AH-62847",
+      name: "Product Reviews App",
+      description: "Shopify reviews app with 2,400 merchants. Founder moved on to new venture, seeking quick sale.",
+      category: "Shopify App",
+      users: "2,400",
+      estMrr: "$3,480",
+      distressScore: 68,
+      lastUpdate: "10 months ago",
+      icon: SiShopify,
       verified: true,
-      revenue: "$180K ARR",
-      profit: "$65K",
-      mrr: "$15K",
-      growth: "+140%",
-      users: "1,200",
-      icon: SiWordpress
+      trend: { direction: "up" as const, percentage: 12 },
+      contactAvailable: { email: true, linkedin: true }
     },
     {
-      id: "AH-73920",
-      name: "Educational Platform",
-      description: "Online learning platform focusing on tech skills with video courses and certifications.",
-      category: "EdTech",
-      verified: true,
-      revenue: "$320K",
-      profit: "$125K",
-      mrr: "$27K",
-      growth: "+75%",
-      users: "12K",
-      icon: SiGithub
+      id: "AH-73918",
+      name: "Standup Bot Pro",
+      description: "Slack app automating daily standups for remote teams. 680 workspaces, stalled development.",
+      category: "Slack App",
+      users: "680 workspaces",
+      estMrr: "$4,352",
+      distressScore: 74,
+      lastUpdate: "14 months ago",
+      icon: SiSlack,
+      verified: false,
+      trend: { direction: "down" as const, percentage: 18 },
+      contactAvailable: { email: true }
     }
   ];
 
@@ -656,67 +687,60 @@ function FeaturedOpportunitiesSection() {
           </Link>
         </motion.div>
         
-        <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {featuredAssets.map((asset, i) => (
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6">
+          {featuredAssets.slice(0, 6).map((asset, i) => (
             <motion.div
               key={asset.id}
               initial={{ opacity: 0, y: 30 }}
               animate={isInView ? { opacity: 1, y: 0 } : {}}
               transition={{ duration: 0.5, delay: i * 0.08 }}
-              className="floating-card p-5 group"
+              className={`floating-card p-4 sm:p-5 group ${i >= 3 ? 'hidden md:block' : ''}`}
               data-testid={`card-featured-${asset.id}`}
             >
               {/* Header badges */}
-              <div className="flex items-center justify-between mb-4">
-                <div className="flex items-center gap-2">
+              <div className="flex items-center justify-between gap-2 mb-3">
+                <div className="flex items-center gap-1.5 flex-wrap">
                   <Badge variant="secondary" className="text-xs rounded-full bg-primary/10 text-primary border-primary/20">
                     {asset.category}
                   </Badge>
                   {asset.verified && (
-                    <Badge variant="outline" className="text-xs rounded-full border-emerald-500/30 text-emerald-600">
+                    <Badge variant="outline" className="text-xs rounded-full bg-emerald-500/10 text-emerald-600 border-emerald-500/30">
                       <CheckCircle className="w-3 h-3 mr-1" />
                       Verified
                     </Badge>
                   )}
                 </div>
-                <TrendingUp className="w-4 h-4 text-muted-foreground group-hover:text-primary transition-colors" />
+                <asset.icon className="w-4 h-4 text-muted-foreground" />
               </div>
               
               {/* Title and description */}
-              <h3 className="font-semibold text-foreground text-lg mb-1" data-testid={`text-featured-name-${asset.id}`}>
+              <h3 className="font-semibold text-foreground text-base sm:text-lg mb-1" data-testid={`text-featured-name-${asset.id}`}>
                 {asset.name}
               </h3>
-              <p className="text-sm text-muted-foreground line-clamp-2 mb-4">
+              <p className="text-sm text-muted-foreground line-clamp-2 mb-3">
                 {asset.description}
               </p>
               
-              {/* Metrics row */}
-              <div className="grid grid-cols-2 gap-3 mb-4">
+              {/* Compact metrics row */}
+              <div className="flex items-center gap-4 text-sm mb-3">
                 <div>
-                  <div className="text-xs text-muted-foreground">Revenue</div>
-                  <div className="font-semibold text-foreground">{asset.revenue}</div>
+                  <span className="text-muted-foreground">{asset.users}</span>
+                  <span className="text-muted-foreground/60 ml-1">users</span>
                 </div>
-                <div>
-                  <div className="text-xs text-muted-foreground">Profit</div>
-                  <div className="font-semibold text-foreground">{asset.profit}</div>
-                </div>
+                <div className="text-muted-foreground/40">|</div>
+                <div className="text-muted-foreground">{asset.lastUpdate}</div>
               </div>
               
-              {/* Footer with MRR and stats */}
-              <div className="flex items-end justify-between pt-3 border-t border-border/50">
-                <div>
-                  <div className="text-xs text-muted-foreground">Est. MRR</div>
-                  <div className="text-lg font-bold text-primary">{asset.mrr}</div>
-                </div>
-                <div className="flex items-center gap-3 text-xs text-muted-foreground">
-                  <span className="flex items-center gap-1">
-                    <TrendingUp className="w-3 h-3 text-emerald-500" />
-                    {asset.growth}
-                  </span>
-                  <span className="flex items-center gap-1">
-                    <Eye className="w-3 h-3" />
-                    {asset.users}
-                  </span>
+              {/* Footer with MRR */}
+              <div className="flex items-center justify-between pt-3 border-t border-border/50">
+                <div className="text-base sm:text-lg font-bold text-primary">{asset.estMrr}<span className="text-xs font-normal text-muted-foreground ml-1">/mo</span></div>
+                <div className="flex items-center gap-2">
+                  {asset.contactAvailable?.email && (
+                    <Mail className="w-3.5 h-3.5 text-emerald-600" />
+                  )}
+                  {asset.contactAvailable?.linkedin && (
+                    <Linkedin className="w-3.5 h-3.5 text-blue-600" />
+                  )}
                 </div>
               </div>
             </motion.div>
@@ -747,143 +771,34 @@ function ValuePropsSection() {
   
   const props = [
     {
+      label: "OWN DISTRIBUTION INSTANTLY",
       title: "Skip the build",
-      subtitle: "Own distribution instantly",
-      description: "Getting 50,000 users is hard. Fixing broken code is easy. We find apps where someone else did the hard part - building an audience.",
+      description: "Getting 50,000 users is hard. Fixing broken code is easy. We find apps where someone else did the hard part.",
       icon: Eye,
       highlight: "Apps with real, active users",
-      color: "from-orange-500 to-red-500"
+      iconBg: "bg-gradient-to-br from-orange-500 to-red-500"
     },
     {
-      title: "Before brokers see them",
-      subtitle: "True off-market access",
-      description: "We scan primary marketplaces for distress signals. No listings. No bidding wars. Just abandoned apps that nobody has approached yet.",
+      label: "BEFORE ANYONE ELSE",
+      title: "Found first",
+      description: "We find dormant apps before anyone else does. No listings. No bidding wars. Just opportunities nobody has found yet.",
       icon: Target,
       highlight: "First-mover advantage",
-      color: "from-primary to-accent"
+      iconBg: "bg-gradient-to-br from-primary to-accent"
     },
     {
+      label: "FROM SCAN TO OFFER",
       title: "Everything to close",
-      subtitle: "From scan to offer",
-      description: "Valuations, owner contact info, cold email templates, and negotiation scripts. We hand you the playbook so you can move fast.",
+      description: "Pricing. Contact info. Email scripts. Everything you need to close the deal fast.",
       icon: Mail,
       highlight: "Deals close in days, not months",
-      color: "from-accent to-emerald-500"
+      iconBg: "bg-gradient-to-br from-blue-500 to-blue-600"
     }
   ];
 
   return (
-    <section ref={ref} className="py-24 px-4 sm:px-6 lg:px-8 relative overflow-hidden">
+    <section ref={ref} className="py-20 px-4 sm:px-6 lg:px-8 relative overflow-hidden">
       <div className="absolute top-0 left-1/2 -translate-x-1/2 w-[800px] h-[400px] bg-gradient-to-b from-primary/5 to-transparent rounded-full blur-3xl" />
-      
-      <div className="relative max-w-7xl mx-auto">
-        <motion.div 
-          initial={{ opacity: 0, y: 20 }}
-          animate={isInView ? { opacity: 1, y: 0 } : {}}
-          transition={{ duration: 0.6 }}
-          className="text-center mb-16"
-        >
-          <h2 className="text-3xl sm:text-4xl lg:text-5xl font-bold mb-4">
-            Own profitable software{" "}
-            <span className="bg-gradient-to-r from-primary to-accent bg-clip-text text-transparent">without building it</span>
-          </h2>
-          <p className="text-lg text-muted-foreground max-w-2xl mx-auto">
-            Skip the painful years of building an audience. Buy apps that already have users paying attention.
-          </p>
-        </motion.div>
-        
-        <div className="grid lg:grid-cols-3 gap-8">
-          {props.map((prop, i) => (
-            <motion.div
-              key={i}
-              initial={{ opacity: 0, y: 30 }}
-              animate={isInView ? { opacity: 1, y: 0 } : {}}
-              transition={{ duration: 0.6, delay: i * 0.15 }}
-              className="floating-card p-8 relative group"
-              data-testid={`card-value-prop-${i}`}
-            >
-              <div className={`w-14 h-14 rounded-2xl bg-gradient-to-br ${prop.color} flex items-center justify-center mb-6 shadow-soft`}>
-                <prop.icon className="w-7 h-7 text-white" />
-              </div>
-              
-              <div className="text-xs font-medium text-primary uppercase tracking-wider mb-2">{prop.subtitle}</div>
-              <h3 className="text-xl font-bold text-foreground mb-3">{prop.title}</h3>
-              <p className="text-muted-foreground leading-relaxed mb-4">{prop.description}</p>
-              
-              <div className="pt-4 border-t border-border">
-                <div className="flex items-center gap-2">
-                  <CheckCircle className="w-4 h-4 text-accent" />
-                  <span className="text-sm font-medium text-foreground">{prop.highlight}</span>
-                </div>
-              </div>
-            </motion.div>
-          ))}
-        </div>
-      </div>
-    </section>
-  );
-}
-
-function LiveDemoSection() {
-  const ref = useRef(null);
-  const isInView = useInView(ref, { once: true, margin: "-100px" });
-  
-  const sampleAssets = [
-    { 
-      name: "TabOrganizer Pro", 
-      platform: "Chrome", 
-      users: "34,200", 
-      mrr: "$3,420", 
-      distress: 8.2, 
-      monetization: 7.8, 
-      techRisk: 2.4, 
-      icon: SiGooglechrome, 
-      color: "text-blue-400",
-      lastUpdate: "18 months ago",
-      status: "MV2 Risk"
-    },
-    { 
-      name: "ShipFast Notify", 
-      platform: "Shopify", 
-      users: "12,800", 
-      mrr: "$2,560", 
-      distress: 9.1, 
-      monetization: 8.4, 
-      techRisk: 1.8, 
-      icon: SiShopify, 
-      color: "text-green-400",
-      lastUpdate: "24 months ago",
-      status: "Abandoned"
-    },
-    { 
-      name: "WP Speed Boost", 
-      platform: "WordPress", 
-      users: "89,000", 
-      mrr: "$3,630", 
-      distress: 7.6, 
-      monetization: 6.9, 
-      techRisk: 3.2, 
-      icon: SiWordpress, 
-      color: "text-sky-400",
-      lastUpdate: "14 months ago",
-      status: "Low Support"
-    },
-  ];
-
-  const getScoreColor = (score: number, isRisk = false) => {
-    if (isRisk) {
-      if (score <= 3) return "text-emerald-400";
-      if (score <= 6) return "text-amber-400";
-      return "text-red-400";
-    }
-    if (score >= 8) return "text-emerald-400";
-    if (score >= 6) return "text-amber-400";
-    return "text-red-400";
-  };
-
-  return (
-    <section ref={ref} className="py-24 px-4 sm:px-6 lg:px-8 relative overflow-hidden">
-      <div className="absolute inset-0 bg-gradient-to-b from-muted/30 via-background to-muted/30" />
       
       <div className="relative max-w-7xl mx-auto">
         <motion.div 
@@ -892,222 +807,139 @@ function LiveDemoSection() {
           transition={{ duration: 0.6 }}
           className="text-center mb-12"
         >
-          <Badge className="rounded-full px-4 py-1.5 bg-accent/10 text-accent border-accent/20 mb-6">
-            <Target className="w-3 h-3 mr-2" />
-            Deal Intelligence Terminal
-          </Badge>
-          <h2 className="text-3xl sm:text-4xl font-bold mb-4">
-            Real-time{" "}
-            <span className="bg-gradient-to-r from-accent to-emerald-400 bg-clip-text text-transparent">acquisition signals</span>
+          <h2 className="text-3xl sm:text-4xl lg:text-5xl font-bold mb-4">
+            Own profitable software{" "}
+            <span className="bg-gradient-to-r from-primary to-accent bg-clip-text text-transparent">without building it</span>
           </h2>
           <p className="text-lg text-muted-foreground max-w-2xl mx-auto">
-            Distress scores, monetization gaps, and flip potential - all calculated live.
+            Years to get users. Or buy them today.
           </p>
         </motion.div>
         
-        {/* Bloomberg-style dark terminal panel */}
-        <motion.div 
-          initial={{ opacity: 0, y: 30 }}
-          animate={isInView ? { opacity: 1, y: 0 } : {}}
-          transition={{ duration: 0.6, delay: 0.2 }}
-          className="rounded-2xl p-6 lg:p-8 max-w-5xl mx-auto shadow-2xl"
-          style={{ 
-            background: 'linear-gradient(135deg, #0F1729 0%, #1a2744 100%)',
-            border: '1px solid rgba(16, 183, 127, 0.2)'
-          }}
-        >
-          {/* Terminal header */}
-          <div className="flex items-center justify-between mb-6 pb-4 border-b border-white/10">
-            <div className="flex items-center gap-3">
-              <div className="flex gap-1.5">
-                <div className="w-3 h-3 rounded-full bg-red-500/80" />
-                <div className="w-3 h-3 rounded-full bg-yellow-500/80" />
-                <div className="w-3 h-3 rounded-full bg-green-500/80" />
-              </div>
-              <span className="text-xs font-mono text-slate-400 ml-2">ASSET_HUNTER_TERMINAL v2.1</span>
-            </div>
-            <div className="flex items-center gap-2">
-              <div className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
-              <span className="text-xs font-mono text-emerald-400">SCANNING 14 MARKETPLACES</span>
-            </div>
-          </div>
-          
-          {/* Stats row */}
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 mb-6">
-            {[
-              { label: "Assets Tracked", value: "2,847", trend: "+124 this week" },
-              { label: "Avg Distress Score", value: "7.8", trend: "High opportunity" },
-              { label: "Total MRR Potential", value: "$428K", trend: "Across all assets" },
-              { label: "New This Week", value: "47", trend: "Fresh opportunities" },
-            ].map((stat, i) => (
-              <div key={i} className="p-3 rounded-lg bg-white/5 border border-white/10">
-                <div className="text-xs text-slate-400 mb-1">{stat.label}</div>
-                <div className="text-xl font-bold text-white font-mono">{stat.value}</div>
-                <div className="text-xs text-emerald-400/80">{stat.trend}</div>
-              </div>
-            ))}
-          </div>
-          
-          {/* Asset rows */}
-          <div className="space-y-3">
-            {sampleAssets.map((asset, i) => (
-              <motion.div
-                key={i}
-                initial={{ opacity: 0, x: -20 }}
-                animate={isInView ? { opacity: 1, x: 0 } : {}}
-                transition={{ duration: 0.5, delay: 0.3 + i * 0.1 }}
-                className="p-4 rounded-xl bg-white/5 border border-white/10 hover:border-emerald-500/30 transition-all group"
-              >
-                <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
-                  {/* Asset info */}
-                  <div className="flex items-center gap-4">
-                    <div className="w-12 h-12 rounded-xl bg-white/10 flex items-center justify-center">
-                      <asset.icon className={`w-6 h-6 ${asset.color}`} />
-                    </div>
-                    <div>
-                      <div className="flex items-center gap-2">
-                        <span className="font-semibold text-white">{asset.name}</span>
-                        <Badge className="text-xs px-2 py-0.5 bg-red-500/20 text-red-400 border-red-500/30">
-                          {asset.status}
-                        </Badge>
-                      </div>
-                      <div className="flex items-center gap-3 text-sm text-slate-400">
-                        <span>{asset.platform}</span>
-                        <span className="text-slate-600">|</span>
-                        <span>{asset.users} users</span>
-                        <span className="text-slate-600">|</span>
-                        <span>Updated {asset.lastUpdate}</span>
-                      </div>
-                    </div>
-                  </div>
-                  
-                  {/* Scores grid */}
-                  <div className="flex items-center gap-4 lg:gap-6">
-                    <div className="grid grid-cols-3 gap-4 text-center">
-                      <div>
-                        <div className="text-xs text-slate-500 mb-1">Distress</div>
-                        <div className={`text-lg font-bold font-mono ${getScoreColor(asset.distress)}`}>
-                          {asset.distress.toFixed(1)}
-                        </div>
-                      </div>
-                      <div>
-                        <div className="text-xs text-slate-500 mb-1">MRR Gap</div>
-                        <div className={`text-lg font-bold font-mono ${getScoreColor(asset.monetization)}`}>
-                          {asset.monetization.toFixed(1)}
-                        </div>
-                      </div>
-                      <div>
-                        <div className="text-xs text-slate-500 mb-1">Tech Risk</div>
-                        <div className={`text-lg font-bold font-mono ${getScoreColor(asset.techRisk, true)}`}>
-                          {asset.techRisk.toFixed(1)}
-                        </div>
-                      </div>
-                    </div>
-                    
-                    {/* MRR badge */}
-                    <div className="hidden sm:block pl-4 border-l border-white/10">
-                      <div className="text-xs text-slate-500 mb-1">Est. MRR</div>
-                      <div className="text-xl font-bold text-emerald-400 font-mono">{asset.mrr}</div>
-                    </div>
-                  </div>
-                </div>
-              </motion.div>
-            ))}
-          </div>
-          
-          {/* Footer */}
-          <div className="mt-6 pt-6 border-t border-white/10 flex flex-col sm:flex-row items-center justify-between gap-4">
-            <div className="flex items-center gap-4">
-              <span className="text-sm text-slate-400 font-mono">Showing 3 of 2,847 tracked assets</span>
-              <div className="hidden sm:flex items-center gap-2 text-xs text-slate-500">
-                <span>Next scan:</span>
-                <span className="text-emerald-400 font-mono">12:34</span>
-              </div>
-            </div>
-            <Button asChild className="rounded-full bg-emerald-500 hover:bg-emerald-600 text-white shadow-lg shadow-emerald-500/20" data-testid="button-view-all">
-              <Link href="/app">
-                Access Full Terminal
-                <ArrowRight className="w-4 h-4 ml-2" />
-              </Link>
-            </Button>
-          </div>
-        </motion.div>
-      </div>
-    </section>
-  );
-}
-
-function ROIBreakdownSection() {
-  const ref = useRef(null);
-  const isInView = useInView(ref, { once: true, margin: "-100px" });
-  
-  const roiCards = [
-    {
-      title: "Micro-SaaS",
-      subtitle: "The Asset",
-      body: "Average distressed Chrome Extension makes $400/mo. Purchase price: $4k.",
-      icon: Target
-    },
-    {
-      title: "The Fix",
-      subtitle: "The Work",
-      body: "Fix the bugs. Update the listing. Automation takes over.",
-      icon: TrendingUp
-    },
-    {
-      title: "The Exit",
-      subtitle: "The Return",
-      body: "Resell for $12k (30x monthly profit). Net Profit: $8,000.",
-      icon: DollarSign
-    }
-  ];
-
-  return (
-    <section ref={ref} className="py-24 px-4 sm:px-6 lg:px-8 relative overflow-hidden">
-      <div className="absolute inset-0 bg-gradient-to-b from-background via-muted/20 to-background" />
-      
-      <div className="relative max-w-7xl mx-auto">
-        <motion.div 
-          initial={{ opacity: 0, y: 20 }}
-          animate={isInView ? { opacity: 1, y: 0 } : {}}
-          transition={{ duration: 0.6 }}
-          className="text-center mb-16"
-        >
-          <h2 className="text-3xl sm:text-4xl font-bold mb-4">
-            The Math is{" "}
-            <span className="bg-gradient-to-r from-primary to-accent bg-clip-text text-transparent">Simple</span>
-          </h2>
-          <p className="text-lg text-muted-foreground max-w-2xl mx-auto">
-            One acquisition pays for a lifetime of access.
-          </p>
-        </motion.div>
-        
-        <div className="grid md:grid-cols-3 gap-6">
-          {roiCards.map((card, i) => (
+        <div className="grid md:grid-cols-3 gap-4 sm:gap-6">
+          {props.map((prop, i) => (
             <motion.div
               key={i}
               initial={{ opacity: 0, y: 30 }}
               animate={isInView ? { opacity: 1, y: 0 } : {}}
               transition={{ duration: 0.6, delay: i * 0.15 }}
-              className="glass-card p-6 shadow-soft-lg bg-slate-900/40 border-white/5 relative overflow-hidden group"
-              data-testid={`roi-card-${i}`}
+              className="bg-background rounded-2xl p-6 border border-border shadow-sm relative group"
+              data-testid={`card-value-prop-${i}`}
             >
-              <div className="absolute inset-0 bg-gradient-to-br from-accent/5 via-transparent to-primary/5 opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
-              <div className="relative z-10">
-                <div className="flex items-center gap-3 mb-4">
-                  <div className="w-12 h-12 rounded-xl bg-accent/10 flex items-center justify-center">
-                    <card.icon className="w-6 h-6 text-accent" />
-                  </div>
-                  <div>
-                    <div className="text-xs text-muted-foreground uppercase tracking-wider">{card.subtitle}</div>
-                    <div className="font-semibold text-foreground text-lg">{card.title}</div>
-                  </div>
-                </div>
-                <p className="text-muted-foreground leading-relaxed">{card.body}</p>
+              <div className={`w-14 h-14 rounded-full ${prop.iconBg} flex items-center justify-center mb-5 shadow-soft`}>
+                <prop.icon className="w-6 h-6 text-white" />
+              </div>
+              
+              <p className="text-xs font-bold tracking-widest text-primary uppercase mb-2">{prop.label}</p>
+              <h3 className="text-xl font-bold text-foreground mb-3">{prop.title}</h3>
+              <p className="text-muted-foreground leading-relaxed mb-6">{prop.description}</p>
+              
+              <div className="flex items-center gap-2">
+                <CheckCircle className="w-4 h-4 text-accent shrink-0" />
+                <span className="text-sm text-muted-foreground">{prop.highlight}</span>
               </div>
             </motion.div>
           ))}
         </div>
+      </div>
+    </section>
+  );
+}
+
+function PrivateDealEngineSection() {
+  const ref = useRef(null);
+  const isInView = useInView(ref, { once: true, margin: "-100px" });
+
+  const flywheel = [
+    {
+      stage: "SCAN",
+      title: "Daily crawl. Weekly drop.",
+      description: "14 private channels. Updated every 24 hours.",
+      metric: "42",
+      metricLabel: "assets this week"
+    },
+    {
+      stage: "SIGNAL",
+      title: "Distress. Demand. Durability.",
+      description: "5-axis scoring: what's broken, what's valuable, what's fixable.",
+      metric: "5",
+      metricLabel: "risk axes scored"
+    },
+    {
+      stage: "CLOSE",
+      title: "Direct line package.",
+      description: "Owner email. LinkedIn. Cold outreach scripts.",
+      metric: "73%",
+      metricLabel: "reply rate · 48hr avg"
+    }
+  ];
+
+  return (
+    <section ref={ref} className="py-20 px-4 sm:px-6 lg:px-8 bg-slate-50/50 dark:bg-slate-900/20">
+      <div className="max-w-5xl mx-auto">
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={isInView ? { opacity: 1, y: 0 } : {}}
+          transition={{ duration: 0.6 }}
+          className="text-center mb-6"
+        >
+          <p className="text-sm font-bold tracking-widest text-accent uppercase mb-3">
+            The Private Deal Engine
+          </p>
+          <h2 className="text-3xl sm:text-4xl lg:text-5xl font-bold mb-4">
+            The quiet exchange{" "}
+            <span className="bg-gradient-to-r from-primary to-accent bg-clip-text text-transparent">
+              for private software.
+            </span>
+          </h2>
+        </motion.div>
+
+        <div className="space-y-4 mb-8">
+          {flywheel.map((step, idx) => (
+            <motion.div
+              key={step.stage}
+              initial={{ opacity: 0, x: -20 }}
+              animate={isInView ? { opacity: 1, x: 0 } : {}}
+              transition={{ duration: 0.5, delay: 0.1 + idx * 0.1 }}
+              className="bg-background rounded-2xl border border-border shadow-sm p-5 sm:p-6 text-left font-medium"
+              data-testid={`flywheel-step-${idx}`}
+            >
+              <div className="flex flex-col sm:flex-row sm:items-center gap-4">
+                <div className="flex items-center gap-4 flex-1">
+                  <div className="w-12 h-12 rounded-full bg-primary/10 flex items-center justify-center shrink-0">
+                    <span className="text-xs font-bold text-primary">{step.stage}</span>
+                  </div>
+                  <div className="flex-1">
+                    <h3 className="font-bold text-foreground mb-1">{step.title}</h3>
+                    <p className="text-sm text-muted-foreground">{step.description}</p>
+                  </div>
+                </div>
+                <div className="flex items-center gap-2 sm:text-right pl-16 sm:pl-0">
+                  <span className="text-2xl font-bold text-accent">{step.metric}</span>
+                  <span className="text-xs text-muted-foreground max-w-[120px]">{step.metricLabel}</span>
+                </div>
+              </div>
+            </motion.div>
+          ))}
+        </div>
+
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={isInView ? { opacity: 1, y: 0 } : {}}
+          transition={{ duration: 0.6, delay: 0.4 }}
+          className="bg-gradient-to-br from-primary/5 to-accent/10 rounded-2xl border border-accent/30 p-6 sm:p-8 text-center"
+        >
+          <p className="text-sm text-muted-foreground mb-2">Scout and Hunter tiers are Beta Full.</p>
+          <p className="text-lg font-bold text-foreground mb-4">
+            Founding Member: <span className="text-accent">7 lifetime seats left</span> in this batch
+          </p>
+          <Button asChild size="lg" className="bg-accent hover:bg-accent/90 text-white border-accent-border" data-testid="button-secure-access">
+            <Link href="/pricing">
+              Secure Lifetime Access
+              <ArrowRight className="w-4 h-4 ml-2" />
+            </Link>
+          </Button>
+        </motion.div>
       </div>
     </section>
   );
@@ -1144,46 +976,54 @@ function PricingSection() {
       price: "$29",
       priceNote: "/mo",
       description: "Find opportunities",
+      idealFor: "Casual Browsers",
       features: [
-        "30 scans + 5 owner reveals",
+        "10 asset reveals / month",
         "5-axis Hunter Radar scoring",
         "MRR + valuation estimates",
         "Confidence indicators"
       ],
-      cta: "Waitlist Full",
+      cta: "Join Waitlist",
       soldOut: true,
       featured: false
     },
     {
       name: "Hunter",
-      price: "$99",
+      price: "$49",
       priceNote: "/mo",
       description: "Close deals",
+      idealFor: "Side Hustlers",
       features: [
-        "Unlimited scans + reveals",
+        "50 asset reveals / month",
+        "No daily limit",
         "30/90-day acquisition playbooks",
-        "Opening offer + walk-away prices",
         "Owner intel + cold emails"
       ],
-      cta: "Waitlist Full",
-      soldOut: true,
-      featured: false
+      cta: "Get Started",
+      soldOut: false,
+      featured: false,
+      spotsRemaining: 7,
+      href: "/api/checkout?tier=hunter"
     },
     {
       name: "Founding Member",
       price: "$149",
-      priceNote: " / Lifetime",
-      description: "Skip the waitlist. Never pay monthly fees. Beta Access.",
+      priceNote: " One-Time",
+      description: "Lifetime Access. Cheaper than 4 months of Hunter.",
+      idealFor: "Serious Investors",
+      closingSoon: true,
       features: [
-        "Everything in Hunter",
+        "300 reveals / month",
         "Lifetime access - one payment",
         "Priority deal alerts",
         "Early access to new features"
       ],
+      finePrint: "Fair Use Policy: 50 reveals/day",
       cta: "Secure Lifetime Access",
       soldOut: false,
       featured: true,
-      spotsRemaining: 7
+      spotsRemaining: 4,
+      href: "/api/checkout?tier=founding"
     }
   ];
 
@@ -1224,22 +1064,32 @@ function PricingSection() {
             >
               {plan.soldOut && (
                 <Badge className="absolute -top-3 left-1/2 -translate-x-1/2 rounded-full bg-red-500 text-white border-red-500">
-                  SOLD OUT
+                  BETA FULL
                 </Badge>
               )}
-              {plan.featured && (
+              {plan.closingSoon && (
+                <Badge className="absolute -top-3 left-1/2 -translate-x-1/2 rounded-full bg-amber-500 text-white border-amber-500">
+                  CLOSING SOON
+                </Badge>
+              )}
+              {!plan.soldOut && !plan.closingSoon && plan.spotsRemaining && (
                 <Badge className="absolute -top-3 left-1/2 -translate-x-1/2 rounded-full bg-accent text-white border-accent">
-                  Best Value
+                  {plan.spotsRemaining} SPOTS LEFT
                 </Badge>
               )}
               
               <div className="text-center mb-6">
                 <h3 className="font-semibold text-foreground mb-1">{plan.name}</h3>
                 <div className="text-3xl font-bold text-foreground">
-                  {plan.price}
+                  {plan.soldOut ? <span className="line-through text-muted-foreground">{plan.price}</span> : plan.price}
                   <span className="text-base font-normal text-muted-foreground">{plan.priceNote}</span>
                 </div>
                 <p className="text-sm text-muted-foreground mt-1">{plan.description}</p>
+                {plan.idealFor && (
+                  <p className="text-xs text-muted-foreground mt-2">
+                    <span className="font-medium">Ideal for:</span> {plan.idealFor}
+                  </p>
+                )}
               </div>
               
               <ul className="space-y-3 mb-8">
@@ -1251,13 +1101,19 @@ function PricingSection() {
                 ))}
               </ul>
               
-              {plan.featured && plan.spotsRemaining && (
+              {plan.spotsRemaining && (
                 <div className="mb-4 p-3 rounded-lg bg-indigo-500/20 border border-indigo-500/30">
                   <div className="flex items-center justify-center gap-2 text-indigo-400 font-bold text-sm tracking-wide">
                     <Sparkles className="w-4 h-4 fill-indigo-400" />
-                    <span className="uppercase">{plan.spotsRemaining} Spots Remaining in this batch</span>
+                    <span className="uppercase">{plan.spotsRemaining} Spots Remaining</span>
                   </div>
                 </div>
+              )}
+
+              {plan.finePrint && (
+                <p className="text-xs text-muted-foreground/70 text-center mb-4 italic">
+                  {plan.finePrint}
+                </p>
               )}
               
               <Button 
@@ -1268,7 +1124,15 @@ function PricingSection() {
                 }`}
                 variant={plan.featured ? 'default' : 'outline'}
                 disabled={plan.soldOut || (plan.featured && isCheckingOut)}
-                onClick={plan.featured ? handleFoundingMemberCheckout : undefined}
+                onClick={() => {
+                  if (plan.href?.startsWith("/api/checkout")) {
+                    window.location.href = plan.href;
+                  } else if (plan.featured) {
+                    handleFoundingMemberCheckout();
+                  } else if (!plan.soldOut) {
+                    window.location.href = "/app";
+                  }
+                }}
                 data-testid={`button-pricing-${plan.name.toLowerCase().replace(' ', '-')}`}
               >
                 {plan.featured && isCheckingOut ? "Redirecting..." : plan.cta}
@@ -1316,22 +1180,23 @@ function NewsletterSection() {
         initial={{ opacity: 0, y: 30 }}
         animate={isInView ? { opacity: 1, y: 0 } : {}}
         transition={{ duration: 0.6 }}
-        className="max-w-2xl mx-auto"
+        className="max-w-4xl mx-auto"
       >
-        <div className="glass-strong rounded-3xl p-8 sm:p-12 border border-border/50 shadow-soft-lg relative">
-          <div className="absolute inset-0 bg-gradient-to-br from-primary/5 to-accent/5 rounded-3xl" />
+        <Card className="rounded-xl border border-card-border text-card-foreground shadow-sm py-8 sm:py-12 relative bg-gradient-to-br from-emerald-50/50 via-[#cfcfcf15] to-emerald-50/50 dark:from-emerald-900/10 dark:via-[#cfcfcf05] dark:to-emerald-900/10">
           <div className="relative text-center">
             <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-primary/10 text-primary text-sm font-medium mb-4">
               <Mail className="w-3.5 h-3.5" />
               <span>Free Weekly Digest</span>
             </div>
             
-            <h3 className="text-2xl sm:text-3xl font-bold mb-3">
-              Get top opportunities delivered
+            <h3 className="text-2xl sm:text-3xl font-bold mb-2">
+              Asset Hunter Newsletter
             </h3>
-            <p className="text-muted-foreground mb-6 max-w-md mx-auto">
-              Every Sunday: 5 handpicked distressed assets with user bases, 
-              MRR potential, and acquisition strategies. No spam, ever.
+            <p className="text-lg text-muted-foreground mb-1">
+              3 Private Assets. Deep-Dive Analysis.
+            </p>
+            <p className="text-muted-foreground mb-6 max-w-lg mx-auto">
+              Every Sunday, receive a full breakdown of 3 unlisted SaaS companies ready to acquire.
             </p>
             
             {submitted ? (
@@ -1365,11 +1230,83 @@ function NewsletterSection() {
             )}
             
             <p className="text-xs text-muted-foreground mt-4">
-              Join the waiting list for the next batch. Unsubscribe anytime.
+              Join 1,500+ asset hunters. Unsubscribe anytime.
             </p>
           </div>
-        </div>
+        </Card>
       </motion.div>
+    </section>
+  );
+}
+
+// ROI Breakdown Section - "The Math is Simple"
+function ROIBreakdownSection() {
+  const ref = useRef(null);
+  const isInView = useInView(ref, { once: true, margin: "-100px" });
+  
+  const steps = [
+    {
+      label: "THE ASSET",
+      title: "Micro-SaaS",
+      description: "Average distressed Chrome Extension makes $400/mo. Purchase price: $4k.",
+      icon: Target,
+      iconBg: "bg-gradient-to-br from-orange-500 to-red-500"
+    },
+    {
+      label: "THE WORK",
+      title: "The Fix",
+      description: "Fix the bugs. Update the listing. Automation takes over.",
+      icon: Wrench,
+      iconBg: "bg-gradient-to-br from-primary to-accent"
+    },
+    {
+      label: "THE RETURN",
+      title: "The Exit",
+      description: "Resell for $12k (30x monthly profit). Net Profit: $8,000.",
+      icon: DollarSign,
+      iconBg: "bg-gradient-to-br from-emerald-500 to-emerald-600"
+    }
+  ];
+
+  return (
+    <section ref={ref} className="py-20 px-4 sm:px-6 lg:px-8 relative overflow-hidden bg-gradient-to-b from-white via-emerald-50/30 to-white dark:from-background dark:via-emerald-900/10 dark:to-background">
+      <div className="relative max-w-7xl mx-auto">
+        <motion.div 
+          initial={{ opacity: 0, y: 20 }}
+          animate={isInView ? { opacity: 1, y: 0 } : {}}
+          transition={{ duration: 0.6 }}
+          className="text-center mb-12"
+        >
+          <h2 className="text-3xl sm:text-4xl font-bold mb-4">
+            The Math is{" "}
+            <span className="bg-gradient-to-r from-primary to-accent bg-clip-text text-transparent">Simple</span>
+          </h2>
+          <p className="text-lg text-muted-foreground">
+            One acquisition pays for a lifetime of access.
+          </p>
+        </motion.div>
+        
+        <div className="grid md:grid-cols-3 gap-6">
+          {steps.map((step, i) => (
+            <motion.div
+              key={i}
+              initial={{ opacity: 0, y: 30, scale: 0.95 }}
+              animate={isInView ? { opacity: 1, y: 0, scale: 1 } : {}}
+              whileHover={{ scale: 1.03, y: -4 }}
+              transition={{ duration: 0.5, delay: i * 0.15 }}
+              className="bg-background rounded-2xl p-6 border border-border shadow-sm"
+              data-testid={`card-roi-${i}`}
+            >
+              <div className={`w-12 h-12 rounded-full ${step.iconBg} flex items-center justify-center mb-4`}>
+                <step.icon className="w-5 h-5 text-white" />
+              </div>
+              <p className="text-xs font-bold tracking-widest text-muted-foreground uppercase mb-2">{step.label}</p>
+              <h3 className="text-xl font-bold text-foreground mb-2">{step.title}</h3>
+              <p className="text-sm text-muted-foreground">{step.description}</p>
+            </motion.div>
+          ))}
+        </div>
+      </div>
     </section>
   );
 }
@@ -1415,6 +1352,38 @@ function FinalCTASection() {
   );
 }
 
+function FounderNoteSection() {
+  const ref = useRef(null);
+  const isInView = useInView(ref, { once: true, margin: "-100px" });
+
+  return (
+    <section ref={ref} className="py-20 px-4 sm:px-6 lg:px-8">
+      <div className="max-w-3xl mx-auto">
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={isInView ? { opacity: 1, y: 0 } : {}}
+          transition={{ duration: 0.6 }}
+          className="text-center"
+        >
+          <h2 className="text-2xl sm:text-3xl font-bold mb-6">
+            The best deals aren't public.
+          </h2>
+          <p className="text-lg text-muted-foreground mb-8 leading-relaxed">
+            That's why we built this. We find dormant apps before they hit the brokers, 
+            so you can make an offer before anyone else knows they're for sale.
+          </p>
+          <Button asChild size="lg" className="rounded-full bg-foreground text-background hover:bg-foreground/90" data-testid="button-founder-cta">
+            <Link href="/feed">
+              Start Hunting
+              <ArrowRight className="w-4 h-4 ml-2" />
+            </Link>
+          </Button>
+        </motion.div>
+      </div>
+    </section>
+  );
+}
+
 function Footer() {
   return (
     <footer className="py-12 px-4 sm:px-6 lg:px-8 border-t border-border">
@@ -1451,7 +1420,6 @@ export default function Landing() {
       <TrustedBySection />
       <FeaturedOpportunitiesSection />
       <ValuePropsSection />
-      <LiveDemoSection />
       <ROIBreakdownSection />
       <PricingSection />
       <NewsletterSection />
